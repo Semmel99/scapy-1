@@ -1,0 +1,93 @@
+% How to use Scapy' CAN layer
+
+############
+############
+
++ Basic operations
+* This testset is for preparation of the campaign
+
+= Load module
+import random
+random.seed()
+
+load_layer("can")
+
+########
+########
+
++ CAN Signals
+~ docs
+* The following examples shows, how CAN signals can be used in Scapy.
+* Some usage examples will show the application
+
+= Motorola byte order (Big Endian) Signals
+* A DBC definition can be written as a Scapy Packet definition.
+* A SignalField supports the arguments unit, scale and offset.
+* Min and Max are not supported
+
+class testFrame1(SignalPacket):
+    fields_desc = [
+        SignalField("sig0", default=0, start=1, size=2, fmt=">B"),
+        SignalField("sig1", default=0, start=7, size=6, fmt=">B"),
+        SignalField("sig2", default=0, start=15, size=11, fmt=">B"),
+        SignalField("sig3", default=0, start=20, size=12, fmt=">B"),
+        SignalField("sig4", default=0, start=24, size=9, fmt=">B"),
+        SignalField("sig7", default=0, start=47, size=10, fmt=">B"),
+        SignalField("sig5", default=0, start=50, size=3, fmt=">B"),
+        SignalField("sig6", default=0, start=53, size=3, fmt=">B"),
+        SignalField("sig8", default=0, start=58, size=3, fmt=">B"),
+        SignalField("sig9", default=0, start=61, size=3, fmt=">B"),
+        SignalField("sig10", default=0, start=63, size=2, fmt=">B")
+    ]
+
+''' Now we create a testFrame1 packet '''
+pkt = testFrame1(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+
+''' Every signal of a pkt can be accessed like this '''
+assert pkt.sig0 == 3
+assert pkt.sig1 == 0x3f
+assert pkt.sig2 == 0x7ff
+assert pkt.sig3 == 0xfff
+assert pkt.sig4 == 0x1ff
+assert pkt.sig7 == 0x3ff
+assert pkt.sig5 == 7
+assert pkt.sig6 == 7
+assert pkt.sig8 == 7
+assert pkt.sig9 == 7
+assert pkt.sig10 == 3
+
+
+= Motorola byte order (Big Endian) dissect test again
+~ docs
+
+class testFrame1(SignalPacket):
+    fields_desc = [
+        SignalField("sig0", default=0, start=1, size=2, fmt=">B"),
+        SignalField("sig1", default=0, start=7, size=6, fmt=">B"),
+        SignalField("sig2", default=0, start=15, size=11, fmt=">B"),
+        SignalField("sig3", default=0, start=20, size=12, fmt=">B"),
+        SignalField("sig4", default=0, start=24, size=9, fmt=">B"),
+        SignalField("sig7", default=0, start=47, size=10, fmt=">B"),
+        SignalField("sig5", default=0, start=50, size=3, fmt=">B"),
+        SignalField("sig6", default=0, start=53, size=3, fmt=">B"),
+        SignalField("sig8", default=0, start=58, size=3, fmt=">B"),
+        SignalField("sig9", default=0, start=61, size=3, fmt=">B"),
+        SignalField("sig10", default=0, start=63, size=2, fmt=">B")
+    ]
+
+''' Now we create a testFrame1 packet '''
+pkt = testFrame1(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+
+''' Every signal of a pkt can be accessed like this '''
+assert pkt.sig0 == 3
+assert pkt.sig1 == 0x3f
+assert pkt.sig2 == 0x7ff
+assert pkt.sig3 == 0xfff
+assert pkt.sig4 == 0x1ff
+assert pkt.sig7 == 0x3ff
+assert pkt.sig5 == 7
+assert pkt.sig6 == 7
+assert pkt.sig8 == 7
+assert pkt.sig9 == 7
+assert pkt.sig10 == 3
+

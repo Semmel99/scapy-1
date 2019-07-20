@@ -259,6 +259,7 @@ def parse_config_file(config_path, verb=3):
       "onlyfailed": false,
       "verb": 3,
       "dump": 0,
+      "docs": 0,
       "crc": true,
       "scapy": "scapy",
       "preexec": {},
@@ -287,6 +288,7 @@ def parse_config_file(config_path, verb=3):
                  onlyfailed=get_if_exist("onlyfailed", False),
                  verb=get_if_exist("verb", 3),
                  dump=get_if_exist("dump", 0), crc=get_if_exist("crc", 1),
+                 docs=get_if_exist("docs", 0),
                  scapy=get_if_exist("scapy", "scapy"),
                  preexec=get_if_exist("preexec", {}),
                  global_preexec=get_if_exist("global_preexec", ""),
@@ -367,6 +369,32 @@ def dump_campaign(test_campaign):
                 c = "[%(crc)s] " % t
             if c or k:
                 print("    %s%s" % (c, k))
+
+
+def docs_campaign(test_campaign):
+    print("%(title)s" % test_campaign)
+    print("=" * (len(test_campaign.title)))
+    print()
+    if len(test_campaign.headcomments):
+        print("%s" % test_campaign.headcomments.strip().replace("\n", ""))
+        print()
+    for ts in test_campaign:
+        print("%s" % ts.name)
+        print("-" * len(ts.name))
+        print()
+        if len(ts.comments):
+            print("%s" % ts.comments.strip().replace("\n", ""))
+            print()
+        for t in ts:
+            print("%s" % t.name)
+            print("^" * len(t.name))
+            print()
+            if len(t.comments):
+                print("%s" % t.comments.strip().replace("\n", ""))
+                print()
+            print("Usage example::")
+            for l in t.test.split('\n'):
+                print("\t%s" % l)
 
 
 #    COMPUTE CAMPAIGN DIGESTS    #
@@ -698,6 +726,7 @@ def usage():
 -b\t\t: don't stop at the first failed campaign
 -d\t\t: dump campaign
 -D\t\t: dump campaign and stop
+-R\t\t: dump campaign as reStructuredText
 -C\t\t: don't calculate CRC and SHA
 -c\t\t: load a .utsc config file
 -q\t\t: quiet mode
@@ -715,7 +744,7 @@ def usage():
 #    MAIN    #
 
 def execute_campaign(TESTFILE, OUTPUTFILE, PREEXEC, NUM, KW_OK, KW_KO, DUMP,
-                     FORMAT, VERB, ONLYFAILED, CRC, autorun_func, pos_begin=0, ignore_globals=None):  # noqa: E501
+                     DOCS, FORMAT, VERB, ONLYFAILED, CRC, autorun_func, pos_begin=0, ignore_globals=None):  # noqa: E501
     # Parse test file
     test_campaign = parse_campaign_file(TESTFILE)
 
@@ -741,6 +770,11 @@ def execute_campaign(TESTFILE, OUTPUTFILE, PREEXEC, NUM, KW_OK, KW_KO, DUMP,
         dump_campaign(test_campaign)
         if DUMP > 1:
             sys.exit()
+
+    # Dump campaign as reStructuredText
+    if DOCS:
+        docs_campaign(test_campaign)
+        sys.exit()
 
     # Run tests
     test_campaign.output_file = OUTPUTFILE
@@ -791,6 +825,7 @@ def main():
     KW_OK = []
     KW_KO = []
     DUMP = 0
+    DOCS = 0
     CRC = True
     BREAKFAILED = True
     ONLYFAILED = False
@@ -801,7 +836,7 @@ def main():
     TESTFILES = []
     ANNOTATIONS_MODE = False
     try:
-        opts = getopt.getopt(argv, "o:t:T:c:f:hbln:m:k:K:DdCFqP:s:x")
+        opts = getopt.getopt(argv, "o:t:T:c:f:hbln:m:k:K:DRdCFqP:s:x")
         for opt, optarg in opts[0]:
             if opt == "-h":
                 usage()
@@ -813,6 +848,8 @@ def main():
                 VERB -= 1
             elif opt == "-D":
                 DUMP = 2
+            elif opt == "-R":
+                DOCS = 1
             elif opt == "-d":
                 DUMP = 1
             elif opt == "-C":
@@ -955,7 +992,7 @@ def main():
         with open(TESTFILE) as testfile:
             output, result, campaign = execute_campaign(testfile, OUTPUTFILE,
                                                         PREEXEC, NUM, KW_OK, KW_KO,
-                                                        DUMP, FORMAT, VERB, ONLYFAILED,
+                                                        DUMP, DOCS, FORMAT, VERB, ONLYFAILED,
                                                         CRC, autorun_func, pos_begin,
                                                         ignore_globals)
         runned_campaigns.append(campaign)
