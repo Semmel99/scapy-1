@@ -1,4 +1,6 @@
-% How to use Scapy' CAN layer
+% How to use Scapy's CAN layer
+
+* RUN ``./test/run_tests_py3 -t test/docs.uts -k docs -R -q`` to get the docs
 
 ############
 ############
@@ -9,85 +11,52 @@
 = Load module
 import random
 random.seed()
+from io import BytesIO
+
+= Load CAN layer
+~ docs
+* This imports the CAN protocol into the current Scapy session
 
 load_layer("can")
 
-########
-########
-
-+ CAN Signals
+= Build a CAN packet
 ~ docs
-* The following examples shows, how CAN signals can be used in Scapy.
-* Some usage examples will show the application
+* A simple CAN packet can be build like this. The length field is set
+* during the build.
 
-= Motorola byte order (Big Endian) Signals
-* A DBC definition can be written as a Scapy Packet definition.
-* A SignalField supports the arguments unit, scale and offset.
-* Min and Max are not supported
-
-class testFrame1(SignalPacket):
-    fields_desc = [
-        SignalField("sig0", default=0, start=1, size=2, fmt=">B"),
-        SignalField("sig1", default=0, start=7, size=6, fmt=">B"),
-        SignalField("sig2", default=0, start=15, size=11, fmt=">B"),
-        SignalField("sig3", default=0, start=20, size=12, fmt=">B"),
-        SignalField("sig4", default=0, start=24, size=9, fmt=">B"),
-        SignalField("sig7", default=0, start=47, size=10, fmt=">B"),
-        SignalField("sig5", default=0, start=50, size=3, fmt=">B"),
-        SignalField("sig6", default=0, start=53, size=3, fmt=">B"),
-        SignalField("sig8", default=0, start=58, size=3, fmt=">B"),
-        SignalField("sig9", default=0, start=61, size=3, fmt=">B"),
-        SignalField("sig10", default=0, start=63, size=2, fmt=">B")
-    ]
-
-''' Now we create a testFrame1 packet '''
-pkt = testFrame1(b'\xff\xff\xff\xff\xff\xff\xff\xff')
-
-''' Every signal of a pkt can be accessed like this '''
-assert pkt.sig0 == 3
-assert pkt.sig1 == 0x3f
-assert pkt.sig2 == 0x7ff
-assert pkt.sig3 == 0xfff
-assert pkt.sig4 == 0x1ff
-assert pkt.sig7 == 0x3ff
-assert pkt.sig5 == 7
-assert pkt.sig6 == 7
-assert pkt.sig8 == 7
-assert pkt.sig9 == 7
-assert pkt.sig10 == 3
+pkt = CAN(identifier=0x133, data=b"\xde\xad\xbe\xef")
+bytes(pkt) == b"\x00\x00\x013\x04\x00\x00\x00\xde\xad\xbe\xef"
 
 
-= Motorola byte order (Big Endian) dissect test again
+= Build a CAN packet with extended addressing
 ~ docs
+* A CAN packet with extended addressing can be build like this.
 
-class testFrame1(SignalPacket):
-    fields_desc = [
-        SignalField("sig0", default=0, start=1, size=2, fmt=">B"),
-        SignalField("sig1", default=0, start=7, size=6, fmt=">B"),
-        SignalField("sig2", default=0, start=15, size=11, fmt=">B"),
-        SignalField("sig3", default=0, start=20, size=12, fmt=">B"),
-        SignalField("sig4", default=0, start=24, size=9, fmt=">B"),
-        SignalField("sig7", default=0, start=47, size=10, fmt=">B"),
-        SignalField("sig5", default=0, start=50, size=3, fmt=">B"),
-        SignalField("sig6", default=0, start=53, size=3, fmt=">B"),
-        SignalField("sig8", default=0, start=58, size=3, fmt=">B"),
-        SignalField("sig9", default=0, start=61, size=3, fmt=">B"),
-        SignalField("sig10", default=0, start=63, size=2, fmt=">B")
-    ]
+pkt = CAN(flags="extended", identifier=0x133, data=b"\xde\xad\xbe\xef")
+bytes(pkt) == b"\x80\x00\x01\x33\x04\x00\x00\x00\xde\xad\xbe\xef"
+pkt.flags == "extended"
 
-''' Now we create a testFrame1 packet '''
-pkt = testFrame1(b'\xff\xff\xff\xff\xff\xff\xff\xff')
+pkt = CAN(flags="extended", identifier=0x1234567, data=b"\xde\xad\xbe\xef")
+bytes(pkt) == b"\x81\x23\x45\x67\x04\x00\x00\x00\xde\xad\xbe\xef"
+pkt.flags == "extended"
 
-''' Every signal of a pkt can be accessed like this '''
-assert pkt.sig0 == 3
-assert pkt.sig1 == 0x3f
-assert pkt.sig2 == 0x7ff
-assert pkt.sig3 == 0xfff
-assert pkt.sig4 == 0x1ff
-assert pkt.sig7 == 0x3ff
-assert pkt.sig5 == 7
-assert pkt.sig6 == 7
-assert pkt.sig8 == 7
-assert pkt.sig9 == 7
-assert pkt.sig10 == 3
++ Operations on candump files
+
+= Interpreting candump output
+~ docs
+* candump is a very useful utility and part of the Linux can-utils packet
+
+b'''  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
+  vcan0       1F3   [8]  11 22 33 44 55 66 77 88
+  vcan0       1F3   [8]  11 22 33 44 55 66 77 88
+  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
+  vcan0       1F3   [8]  11 22 33 44 55 66 77 88
+  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
+  vcan0  1F334455   [4]  11 22 33 44
+  vcan0       1F3   [4]  11 22 33 44'''
+
+candump_fd = BytesIO(_)
+packets = rdcandump(candump_fd)
+assert len(packets) == 8
+
 
