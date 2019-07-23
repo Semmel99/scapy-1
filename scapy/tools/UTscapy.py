@@ -394,7 +394,8 @@ def docs_campaign(test_campaign):
                 print()
             print("Usage example::")
             for l in t.test.split('\n'):
-                print("\t%s" % l)
+                if not l.rstrip().endswith('# no_docs'):
+                    print("\t%s" % l)
 
 
 #    COMPUTE CAMPAIGN DIGESTS    #

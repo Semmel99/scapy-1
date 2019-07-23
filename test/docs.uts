@@ -25,7 +25,7 @@ load_layer("can")
 * during the build.
 
 pkt = CAN(identifier=0x133, data=b"\xde\xad\xbe\xef")
-bytes(pkt) == b"\x00\x00\x013\x04\x00\x00\x00\xde\xad\xbe\xef"
+bytes(pkt) == b"\x00\x00\x013\x04\x00\x00\x00\xde\xad\xbe\xef"  # no_docs
 
 
 = Build a CAN packet with extended addressing
@@ -33,12 +33,12 @@ bytes(pkt) == b"\x00\x00\x013\x04\x00\x00\x00\xde\xad\xbe\xef"
 * A CAN packet with extended addressing can be build like this.
 
 pkt = CAN(flags="extended", identifier=0x133, data=b"\xde\xad\xbe\xef")
-bytes(pkt) == b"\x80\x00\x01\x33\x04\x00\x00\x00\xde\xad\xbe\xef"
-pkt.flags == "extended"
+bytes(pkt) == b"\x80\x00\x01\x33\x04\x00\x00\x00\xde\xad\xbe\xef"  # no_docs
+pkt.flags == "extended"  # no_docs
 
 pkt = CAN(flags="extended", identifier=0x1234567, data=b"\xde\xad\xbe\xef")
-bytes(pkt) == b"\x81\x23\x45\x67\x04\x00\x00\x00\xde\xad\xbe\xef"
-pkt.flags == "extended"
+bytes(pkt) == b"\x81\x23\x45\x67\x04\x00\x00\x00\xde\xad\xbe\xef"  # no_docs
+pkt.flags == "extended"  # no_docs
 
 + Operations on candump files
 
@@ -57,6 +57,6 @@ b'''  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
 
 candump_fd = BytesIO(_)
 packets = rdcandump(candump_fd)
-assert len(packets) == 8
+assert len(packets) == 8  # no_docs
 
 
