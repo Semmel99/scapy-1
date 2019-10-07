@@ -46,7 +46,7 @@ pkt.flags == "extended"  # no_docs
 ~ docs
 * candump is a very useful utility and part of the Linux can-utils packet
 
-b'''  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
+inp = b'''  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
   vcan0       1F3   [8]  11 22 33 44 55 66 77 88
   vcan0       1F3   [8]  11 22 33 44 55 66 77 88
   vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
@@ -55,7 +55,7 @@ b'''  vcan0  1F334455   [8]  11 22 33 44 55 66 77 88
   vcan0  1F334455   [4]  11 22 33 44
   vcan0       1F3   [4]  11 22 33 44'''
 
-candump_fd = BytesIO(_)
+candump_fd = BytesIO(inp)
 packets = rdcandump(candump_fd)
 assert len(packets) == 8  # no_docs
 
