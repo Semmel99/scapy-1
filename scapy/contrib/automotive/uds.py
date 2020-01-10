@@ -8,6 +8,7 @@
 
 import struct
 import time
+from typing import Callable, Union
 from scapy.fields import ByteEnumField, StrField, ConditionalField, \
     BitEnumField, BitField, XByteField, FieldListField, \
     XShortField, X3BytesField, XIntField, ByteField, \
@@ -1390,7 +1391,8 @@ class UDS_Enumerator(object):
         raise NotImplementedError
 
     @staticmethod
-    def get_label(response, positive_case="PositiveResponse"):
+    def get_label(response,
+                  positive_case: Union[str, Callable] = "PositiveResponse"):
         if response is None:
             label = "Timeout"
         elif response.service == 0x7f:
@@ -1409,7 +1411,7 @@ class UDS_Enumerator(object):
 class UDS_SessionEnumerator(UDS_Enumerator):
     description = "Available sessions"
     negative_response_blacklist = [0x10, 0x11, 0x12]
-    
+
     def scan(self, session="DefaultSession", session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
         pkts = UDS() / UDS_DSC(diagnosticSessionType=session_range)
@@ -1417,9 +1419,11 @@ class UDS_SessionEnumerator(UDS_Enumerator):
         for req in pkts:
             super(UDS_SessionEnumerator, self).scan(session, [req], timeout=3,
                                                     **kwargs)
-            if self.results[-1][2] != None and self.results[-1][2].service != 0x7f:
+            # reset if positive response received
+            last_response = self.results[-1][2]
+            if last_response is not None and last_response.service == 0x50:
                 reset_handler()
-    
+
     @staticmethod
     def get_table_entry(tup):
         _, req, res = tup
@@ -1522,36 +1526,42 @@ class UDS_SecurityAccessEnumerator(UDS_Enumerator):
 
 
 class UDS_RCEnumerator(UDS_Enumerator):
-    description = "Available Routine Controls and negative response per session"
+    description = "Available RoutineControls and negative response per session"
     negative_response_blacklist = [0x10, 0x11, 0x31]
-    
-    def scan(self, session="DefaultSession", scan_range=range(0xffff), **kwargs):
-        pkts = (UDS() / UDS_RC(routineControlType=2,routineIdentifier=x) for x in scan_range)
+
+    def scan(self, session="DefaultSession", scan_range=range(0xffff),
+             **kwargs):
+        pkts = (UDS() / UDS_RC(routineControlType=2, routineIdentifier=x)
+                for x in scan_range)
         super(UDS_RCEnumerator, self).scan(session, pkts, **kwargs)
-    
+
     @staticmethod
     def get_table_entry(tup):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res)
         return (session,
-                "0x%02x: %s" % (req.routineIdentifier, req.sprintf("%UDS_RC.routineIdentifier%")),
+                "0x%02x: %s" % (req.routineIdentifier,
+                                req.sprintf("%UDS_RC.routineIdentifier%")),
                 label)
 
 
 class UDS_IOCBIEnumerator(UDS_Enumerator):
-    description = "Available Input Output Controls By Identifier and negative response per session"
+    description = "Available Input Output Controls By Identifier " \
+                  "and negative response per session"
     negative_response_blacklist = [0x10, 0x11, 0x31]
-    
-    def scan(self, session="DefaultSession", scan_range=range(0xffff), **kwargs):
+
+    def scan(self, session="DefaultSession", scan_range=range(0xffff),
+             **kwargs):
         pkts = (UDS() / UDS_IOCBI(dataIdentifier=x) for x in scan_range)
         super(UDS_IOCBIEnumerator, self).scan(session, pkts, **kwargs)
-    
+
     @staticmethod
     def get_table_entry(tup):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res)
         return (session,
-                "0x%02x: %s" % (req.dataIdentifier, req.sprintf("%UDS_IOCBI.dataIdentifier%")),
+                "0x%02x: %s" % (req.dataIdentifier,
+                                req.sprintf("%UDS_IOCBI.dataIdentifier%")),
                 label)
 
 
@@ -1585,18 +1595,23 @@ def enter_session(*args, **kwargs):
         enter_through_extended(*args, **kwargs)
 
 
-def execute_session_based_scan(sock, reset_handler, enumerator,sessions, **kwargs):
+def execute_session_based_scan(sock, reset_handler, enumerator,
+                               sessions, **kwargs):
     reset_handler()
     for session_iter in [1] + list(sessions):
         if session_iter != 1 and enter_session(sock, session_iter) is False:
             print("Error during session change to session %d" % session_iter)
+
         else:
+            tps = UDS_TesterPresentSender(sock)
             if session_iter != 1:
-                tps = UDS_TesterPresentSender(sock)
                 tps.start()
+
             enumerator.scan(session=get_session_string(session_iter), **kwargs)
+
             if session_iter != 1:
                 tps.stop()
+
         reset_handler()
     enumerator.show()
 
@@ -1606,45 +1621,44 @@ def UDS_Scan(sock, reset_handler, **kwargs):
     sessions = UDS_SessionEnumerator(sock)
     sessions.scan(reset_handler=reset_handler)
     sessions.show()
-    
+
     reset_handler()
-    
+
     available_sessions = set([2, 3] +
                              [req.diagnosticSessionType
                               for session, req, _ in
                               sessions.filter_results()])
-    
+
     execute_session_based_scan(sock, reset_handler,
                                UDS_ServiceEnumerator(sock),
                                available_sessions)
-    
+
     rdbi = UDS_RDBIEnumerator(sock)
     execute_session_based_scan(sock, reset_handler, rdbi,
                                available_sessions,
                                scan_range=kwargs.pop("rdbi_scan_range",
                                                      range(0x10000)))
-    
+
     execute_session_based_scan(sock, reset_handler, UDS_WDBIEnumerator(sock),
                                available_sessions,
                                rdbi_enumerator=rdbi)
-    
+
     execute_session_based_scan(sock, reset_handler,
                                UDS_RCEnumerator(sock),
                                available_sessions)
-    
+
     execute_session_based_scan(sock, reset_handler,
                                UDS_IOCBIEnumerator(sock),
                                available_sessions)
-    
-    execute_session_based_scan(sock, reset_handler,
-                               UDS_SecurityAccessEnumerator(sock),
-                               available_sessions)
-    
-    execute_session_based_scan(sock, reset_handler,
-                               UDS_SecurityAccessEnumerator(sock),
-                               available_sessions)
-    
+
     execute_session_based_scan(sock, reset_handler,
                                UDS_SecurityAccessEnumerator(sock),
                                available_sessions)
 
+    execute_session_based_scan(sock, reset_handler,
+                               UDS_SecurityAccessEnumerator(sock),
+                               available_sessions)
+
+    execute_session_based_scan(sock, reset_handler,
+                               UDS_SecurityAccessEnumerator(sock),
+                               available_sessions)
