@@ -1412,17 +1412,37 @@ class UDS_SessionEnumerator(UDS_Enumerator):
     description = "Available sessions"
     negative_response_blacklist = [0x10, 0x11, 0x12]
 
+    def enter_session(self, session, reset_handler=None, verbose=False,
+                      **kwargs):
+        if reset_handler:
+            reset_handler()
+        if session in [0, 1]:
+            return True
+        req = UDS() / UDS_DSC(diagnosticSessionType=session)
+        ans = self.sock.sr1(req, timeout=2, verbose=False, **kwargs)
+        if ans is not None and verbose:
+            print("Try to enter session %s" % session)
+            print(repr(req))
+            print(repr(ans))
+        time.sleep(1)
+        return ans is not None and ans.service != 0x7f
+
     def scan(self, session="DefaultSession", session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
         pkts = UDS() / UDS_DSC(diagnosticSessionType=session_range)
-        reset_handler()
+        if reset_handler:
+            reset_handler()
+
+        timeout = kwargs.pop("timeout", 3)
         for req in pkts:
-            super(UDS_SessionEnumerator, self).scan(session, [req], timeout=3,
+            super(UDS_SessionEnumerator, self).scan(session, [req],
+                                                    timeout=timeout,
                                                     **kwargs)
             # reset if positive response received
             last_response = self.results[-1][2]
             if last_response is not None and last_response.service == 0x50:
-                reset_handler()
+                if reset_handler:
+                    reset_handler()
 
     @staticmethod
     def get_table_entry(tup):
