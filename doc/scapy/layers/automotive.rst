@@ -66,7 +66,6 @@ Send and receive a message over Linux SocketCAN::
    rx_packet = socket.recv()
 
    socket.sr1(packet, timeout=1)
-   srcan(packet, 'can0', timeout=1)
 
 Send a message over a Vector CAN-Interface::
 
@@ -83,7 +82,6 @@ Send a message over a Vector CAN-Interface::
    rx_packet = socket.recv()
 
    socket.sr1(packet)
-   srcan(packet, VectorBus(0, bitrate=1000000), timeout=1)
 
 
 
@@ -250,35 +248,29 @@ CANSocket python-can
 
 python-can is required to use various CAN-interfaces on Windows, OSX or Linux.
 The python-can library is used through a CANSocket object. To create a python-can
-CANSocket object, a python-can ``Bus`` object has to be used as interface.
-The ``timeout`` parameter can be used to increase the receive performance of a
-python-can CANSocket object. ``recv`` inside a python-can CANSocket object is
-implemented through busy wait, since there is no ``select`` functionality on
-Windows or on some proprietary CAN interfaces (like Vector interfaces). A small
-``timeout`` might be required, if a ``sniff`` or ``bridge_and_sniff`` on multiple
-interfaces is performed.
+CANSocket object, all parameters of a python-can ``interface.Bus`` object has to 
+be used for the initialization of the CANSocket.
 
 Ways of creating a python-can CANSocket::
 
    conf.contribs['CANSocket'] = {'use-python-can': True}
    load_contrib('cansocket')
-   import can
 
 Creating a simple python-can CANSocket::
 
-   socket = CANSocket(iface=can.interface.Bus(bustype='socketcan', channel='vcan0', bitrate=250000))
+   socket = CANSocket(bustype='socketcan', channel='vcan0', bitrate=250000)
 
 Creating a python-can CANSocket with multiple filters::
 
-   socket = CANSocket(iface=can.interface.Bus(bustype='socketcan', channel='vcan0', bitrate=250000,
+   socket = CANSocket(bustype='socketcan', channel='vcan0', bitrate=250000,
                    can_filters=[{'can_id': 0x200, 'can_mask': 0x7ff},
                                {'can_id': 0x400, 'can_mask': 0x7ff},
                                {'can_id': 0x600, 'can_mask': 0x7ff},
-                               {'can_id': 0x7ff, 'can_mask': 0x7ff}]))
+                               {'can_id': 0x7ff, 'can_mask': 0x7ff}])
 
 .. image:: ../graphics/animations/animation-scapy-python-can-cansocket.svg
 
-For further details on python-can check: https://python-can.readthedocs.io/en/2.2.0/
+For further details on python-can check: https://python-can.readthedocs.io/
 
 CANSocket MITM attack with bridge and sniff
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

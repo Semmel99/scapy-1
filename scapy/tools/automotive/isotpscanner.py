@@ -141,28 +141,36 @@ def main():
         print("start must be equal or smaller than end.", file=sys.stderr)
         sys.exit(-1)
 
-    if PYTHON_CAN:
-        import can
-        try:
-            can.rc['interface'] = interface
-            can.rc['channel'] = channel
-            can.rc['bitrate'] = bitrate
-            scan_interface = can.interface.Bus()
-            interface_string = "CANSocket(iface=can.interface.Bus(bustype=" \
-                               "'%s', channel='%s', bitrate=%d))" % \
-                               (interface, channel, bitrate)
-        except Exception as e:
-            usage()
-            print("\nCheck python-can interface assignment.\n",
-                  file=sys.stderr)
-            print(e, file=sys.stderr)
-            sys.exit(-1)
-    else:
-        scan_interface = channel
-        interface_string = "\"%s\"" % channel
+    sock = None
 
     try:
-        sock = CANSocket(iface=scan_interface)
+        if PYTHON_CAN:
+            sock = CANSocket(bustype='socketcan', channel=channel,
+                             bitrate=bitrate)
+            interface_string = "CANSocket(bustype=" \
+                               "'%s', channel='%s', bitrate=%d)" % \
+                               (interface, channel, bitrate)
+        else:
+            sock = CANSocket(iface=channel)
+            interface_string = "\"%s\"" % channel
+
+        if verbose:
+            print("Start scan (%s - %s)" % (hex(start), hex(end)))
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        result = ISOTPScan(sock,
+                           range(start, end + 1),
+                           extended_addressing=extended,
+                           noise_listen_time=noise_listen_time,
+                           sniff_time=float(sniff_time) / 1000,
+                           output_format="code" if piso else "text",
+                           can_interface=interface_string,
+                           extended_can_id=extended_can_id,
+                           verbose=verbose)
+
+        print("Scan: \n%s" % result)
+
     except Exception as e:
         usage()
         print("\nSocket couldn't be created. Check your arguments.\n",
@@ -170,22 +178,9 @@ def main():
         print(e, file=sys.stderr)
         sys.exit(-1)
 
-    if verbose:
-        print("Start scan (%s - %s)" % (hex(start), hex(end)))
-
-    signal.signal(signal.SIGINT, signal_handler)
-
-    result = ISOTPScan(sock,
-                       range(start, end + 1),
-                       extended_addressing=extended,
-                       noise_listen_time=noise_listen_time,
-                       sniff_time=float(sniff_time) / 1000,
-                       output_format="code" if piso else "text",
-                       can_interface=interface_string,
-                       extended_can_id=extended_can_id,
-                       verbose=verbose)
-
-    print("Scan: \n%s" % result)
+    finally:
+        if sock is not None:
+            sock.close()
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@
 # scapy.contrib.status = loads
 
 """
-Native CANSocket.
+NativeCANSocket.
 """
 
 import struct
@@ -26,7 +26,7 @@ CAN_FRAME_SIZE = 16
 CAN_INV_FILTER = 0x20000000
 
 
-class CANSocket(SuperSocket):
+class NativeCANSocket(SuperSocket):
     desc = "read/write packets at a given CAN interface using PF_CAN sockets"
     nonblocking_socket = True
 
@@ -110,11 +110,4 @@ class CANSocket(SuperSocket):
         self.ins.close()
 
 
-@conf.commands.register
-def srcan(pkt, iface=None, receive_own_messages=False,
-          canfilter=None, basecls=CAN, *args, **kargs):
-    s = CANSocket(iface, receive_own_messages=receive_own_messages,
-                  can_filters=canfilter, basecls=basecls)
-    a, b = s.sr(pkt, *args, **kargs)
-    s.close()
-    return a, b
+CANSocket = NativeCANSocket
