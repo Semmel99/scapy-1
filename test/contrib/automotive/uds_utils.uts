@@ -180,8 +180,7 @@ example_responses = [ \
      ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=6, sessionParameterRecord=b"dead")),
      ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=7, sessionParameterRecord=b"dead")),
      ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=8, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(8,10), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=9, sessionParameterRecord=b"dead1")),
-     ECUResponse(session=range(8,10), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=9, sessionParameterRecord=b"dead2")),
+     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_ERPR(resetType="hardReset")),
      ECUResponse(session=range(0,255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x7f, requestServiceId=0x10))
      ]
 
@@ -194,6 +193,7 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
         scanner = UDS_SessionEnumerator(tester)
         scanner.scan(timeout=0.1)
         scanner.show()
+
     finally:
         sim.join(timeout=10)
 

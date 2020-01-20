@@ -8,7 +8,6 @@
 
 import struct
 import time
-from typing import Callable, Union
 from scapy.fields import ByteEnumField, StrField, ConditionalField, \
     BitEnumField, BitField, XByteField, FieldListField, \
     XShortField, X3BytesField, XIntField, ByteField, \
@@ -1381,9 +1380,11 @@ class UDS_Enumerator(object):
 
     def show(self, filtered=True):
         data = self.results if not filtered else self.filter_results()
-        print("\r\n\r\n" + "=" * (len(self.description) + 5))
+        print("\r\n\r\n" + "=" * (len(self.description) + 10))
         print(" " * 5 + self.description)
-        print("-" * (len(self.description) + 5))
+        print("-" * (len(self.description) + 10))
+        print("The following negative response codes are blacklisted: %s" %
+              self.negative_response_blacklist)
         make_lined_table(data, self.get_table_entry)
 
     @staticmethod
@@ -1449,7 +1450,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
         _, req, res = tup
         label = UDS_Enumerator.get_label(res, "Supported")
         return ("Session",
-                "0x%02x: %s" % (req.diagnosticSessionType, req.sprintf(
+                "0x%04x: %s" % (req.diagnosticSessionType, req.sprintf(
                     "%UDS_DSC.diagnosticSessionType%")),
                 label)
 
@@ -1467,7 +1468,7 @@ class UDS_ServiceEnumerator(UDS_Enumerator):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res)
         return (session,
-                "0x%02x: %s" % (req.service, req.sprintf("%UDS.service%")),
+                "0x%04x: %s" % (req.service, req.sprintf("%UDS.service%")),
                 label)
 
 
@@ -1493,7 +1494,7 @@ class UDS_RDBIEnumerator(UDS_Enumerator):
             res,
             positive_case=lambda: UDS_RDBIEnumerator.print_information(res))
         return (session,
-                "0x%02x: %s" % (req.identifiers[0],
+                "0x%04x: %s" % (req.identifiers[0],
                                 req.sprintf("%UDS_RDBI.identifiers%")[1:-1]),
                 label)
 
@@ -1523,7 +1524,7 @@ class UDS_WDBIEnumerator(UDS_Enumerator):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res, "Writeable")
         return (session,
-                "0x%02x: %s" % (req.dataIdentifier,
+                "0x%04x: %s" % (req.dataIdentifier,
                                 req.sprintf("%UDS_WDBI.dataIdentifier%")),
                 label)
 
@@ -1560,7 +1561,7 @@ class UDS_RCEnumerator(UDS_Enumerator):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res)
         return (session,
-                "0x%02x: %s" % (req.routineIdentifier,
+                "0x%04x: %s" % (req.routineIdentifier,
                                 req.sprintf("%UDS_RC.routineIdentifier%")),
                 label)
 
@@ -1580,7 +1581,7 @@ class UDS_IOCBIEnumerator(UDS_Enumerator):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res)
         return (session,
-                "0x%02x: %s" % (req.dataIdentifier,
+                "0x%04x: %s" % (req.dataIdentifier,
                                 req.sprintf("%UDS_IOCBI.dataIdentifier%")),
                 label)
 
