@@ -1392,7 +1392,7 @@ class UDS_Enumerator(object):
 
     @staticmethod
     def get_label(response,
-                  positive_case: Union[str, Callable] = "PositiveResponse"):
+                  positive_case="PositiveResponse"):  # type: Union[str, Callable]  # noqa: E501
         if response is None:
             label = "Timeout"
         elif response.service == 0x7f:
