@@ -1457,7 +1457,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
             print(repr(ans))
         return ans is not None and ans.service != 0x7f
 
-    def scan(self, session="DefaultSession", session_range=range(2, 0x100),
+    def scan(self, session=1, session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
         pkts = UDS() / UDS_DSC(diagnosticSessionType=session_range)
         if reset_handler:
@@ -1477,8 +1477,8 @@ class UDS_SessionEnumerator(UDS_Enumerator):
         self.sessions_visited.add(session)
         # get requests with positive response from this session
         reqs = [req for s, req, resp in self.results
-                if s == session and resp is not None
-                and req is not None and resp.service == 0x50]
+                if s == session and resp is not None and
+                req is not None and resp.service == 0x50]
 
         for req in reqs:
             if req.diagnosticSessionType in self.sessions_visited:
