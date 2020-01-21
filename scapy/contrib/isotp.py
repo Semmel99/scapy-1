@@ -1781,7 +1781,7 @@ def filter_periodic_packets(packet_dict, verbose=False):
         if all(abs(t1 - t2) < 0.001 for t1, t2 in zip(tg[1:], tg[:-1])):
             if verbose:
                 print("[i] Identifier 0x%03x seems to be periodic. "
-                      "Filtered.")
+                      "Filtered." % idn)
             for k in key_lst:
                 del packet_dict[k]
 
