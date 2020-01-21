@@ -1439,8 +1439,9 @@ class UDS_SessionEnumerator(UDS_Enumerator):
         return None
 
     def get_session_paths(self):
-        return [UDS_SessionEnumerator.find_path(
+        paths = [UDS_SessionEnumerator.find_path(
             self.state_transitions, 1, s) for s in self.sessions_visited]
+        return [p for p in paths if p is not None]
 
     def enter_session(self, session, reset_handler=None, verbose=False,
                       **kwargs):
