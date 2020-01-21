@@ -8,6 +8,7 @@
 
 import struct
 import time
+
 from scapy.fields import ByteEnumField, StrField, ConditionalField, \
     BitEnumField, BitField, XByteField, FieldListField, \
     XShortField, X3BytesField, XIntField, ByteField, \
@@ -1393,11 +1394,11 @@ class UDS_Enumerator(object):
 
     @staticmethod
     def get_label(response,
-                  positive_case="PositiveResponse"):  # type: Union[str, Callable]  # noqa: E501
+                  positive_case="PR: PositiveResponse"):  # type: Union[str, Callable]  # noqa: E501
         if response is None:
             label = "Timeout"
         elif response.service == 0x7f:
-            label = response.sprintf("%UDS_NR.negativeResponseCode%")
+            label = response.sprintf("NR: %UDS_NR.negativeResponseCode%")
         else:
             if isinstance(positive_case, six.string_types):
                 label = positive_case
@@ -1412,6 +1413,34 @@ class UDS_Enumerator(object):
 class UDS_SessionEnumerator(UDS_Enumerator):
     description = "Available sessions"
     negative_response_blacklist = [0x10, 0x11, 0x12]
+    sessions_visited = set()
+    state_transitions = dict()
+
+    def reset(self):
+        super(UDS_SessionEnumerator, self).reset()
+        self.sessions_visited = set()
+        self.state_transitions = dict()
+
+    @staticmethod
+    def find_path(graph, start, end, path=None):
+        if path is None:
+            path = list()
+        path = path + [start]
+        if start == end:
+            return path
+        if start not in graph.keys():
+            return None
+        for node in graph[start]:
+            if node in path:
+                continue
+            newpath = UDS_SessionEnumerator.find_path(graph, node, end, path)
+            if newpath:
+                return newpath
+        return None
+
+    def get_session_paths(self):
+        return [UDS_SessionEnumerator.find_path(
+            self.state_transitions, 1, s) for s in self.sessions_visited]
 
     def enter_session(self, session, reset_handler=None, verbose=False,
                       **kwargs):
@@ -1425,7 +1454,6 @@ class UDS_SessionEnumerator(UDS_Enumerator):
             print("Try to enter session %s" % session)
             print(repr(req))
             print(repr(ans))
-        time.sleep(1)
         return ans is not None and ans.service != 0x7f
 
     def scan(self, session="DefaultSession", session_range=range(2, 0x100),
@@ -1441,16 +1469,36 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                                                     **kwargs)
             # reset if positive response received
             last_response = self.results[-1][2]
-            if last_response is not None and last_response.service == 0x50:
-                if reset_handler:
-                    reset_handler()
+            if last_response is not None and last_response.service == 0x50 \
+                    and reset_handler:
+                reset_handler()
+
+        self.sessions_visited.add(session)
+        # get requests with positive response from this session
+        reqs = [req for s, req, resp in self.results
+                if s == session and resp is not None
+                and req is not None and resp.service == 0x50]
+
+        for req in reqs:
+            if req.diagnosticSessionType in self.sessions_visited:
+                continue
+            self.scan(session=req.diagnosticSessionType,
+                      reset_handler=lambda: [x() for x in
+                                             [reset_handler,
+                                              lambda: self.enter_session(
+                                                  req.diagnosticSessionType,
+                                                  **kwargs)]],
+                      session_range=session_range, **kwargs)
+        if reqs:
+            self.state_transitions[session] = [r.diagnosticSessionType
+                                               for r in reqs]
 
     @staticmethod
     def get_table_entry(tup):
-        _, req, res = tup
-        label = UDS_Enumerator.get_label(res, "Supported")
-        return ("Session",
-                "0x%04x: %s" % (req.diagnosticSessionType, req.sprintf(
+        session, req, res = tup
+        label = UDS_Enumerator.get_label(res, "PR: Supported")
+        return (session,
+                "0x%02x: %s" % (req.diagnosticSessionType, req.sprintf(
                     "%UDS_DSC.diagnosticSessionType%")),
                 label)
 
@@ -1468,7 +1516,7 @@ class UDS_ServiceEnumerator(UDS_Enumerator):
         session, req, res = tup
         label = UDS_Enumerator.get_label(res)
         return (session,
-                "0x%04x: %s" % (req.service, req.sprintf("%UDS.service%")),
+                "0x%02x: %s" % (req.service, req.sprintf("%UDS.service%")),
                 label)
 
 
@@ -1485,7 +1533,7 @@ class UDS_RDBIEnumerator(UDS_Enumerator):
     def print_information(response_packet):
         load = bytes(response_packet)[3:] if len(response_packet) > 3 \
             else "No data available"
-        return "%s" % ((load[:17] + b"...") if len(load) > 20 else load)
+        return "PR: %s" % ((load[:17] + b"...") if len(load) > 20 else load)
 
     @staticmethod
     def get_table_entry(tup):
@@ -1542,7 +1590,7 @@ class UDS_SecurityAccessEnumerator(UDS_Enumerator):
     def get_table_entry(tup):
         session, req, res = tup
         label = UDS_Enumerator.get_label(
-            res, positive_case=lambda: res.securitySeed)
+            res, positive_case=lambda: "PR: %s" % res.securitySeed)
         return session, req.securityAccessType, label
 
 
@@ -1617,24 +1665,31 @@ def enter_session(*args, **kwargs):
 
 
 def execute_session_based_scan(sock, reset_handler, enumerator,
-                               sessions, **kwargs):
-    reset_handler()
-    for session_iter in [1] + list(sessions):
-        if session_iter != 1 and enter_session(sock, session_iter) is False:
-            print("Error during session change to session %d" % session_iter)
+                               session_paths, **kwargs):
+    for session_path in session_paths:
+        reset_handler()
+        change_successful = True
+        for session_change in session_path:
+            if session_change != 1 and \
+                    enter_session_direct(sock, session_change) is False:
+                print("Error during session change to session %d" %
+                      session_change)
+                change_successful = False
+                break
 
-        else:
+        if change_successful:
             tps = UDS_TesterPresentSender(sock)
-            if session_iter != 1:
+            if session_path[-1] != 1:
                 tps.start()
 
-            enumerator.scan(session=get_session_string(session_iter), **kwargs)
+            enumerator.scan(session=get_session_string(session_path[-1]),
+                            **kwargs)
 
-            if session_iter != 1:
+            if session_path[-1] != 1:
                 tps.stop()
 
-        reset_handler()
-    enumerator.show()
+            reset_handler()
+            enumerator.show()
 
 
 def UDS_Scan(sock, reset_handler, **kwargs):
@@ -1645,10 +1700,7 @@ def UDS_Scan(sock, reset_handler, **kwargs):
 
     reset_handler()
 
-    available_sessions = set([2, 3] +
-                             [req.diagnosticSessionType
-                              for session, req, _ in
-                              sessions.filter_results()])
+    available_sessions = sessions.get_session_paths()
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_ServiceEnumerator(sock),

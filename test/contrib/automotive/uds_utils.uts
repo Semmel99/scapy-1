@@ -193,7 +193,39 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
         scanner = UDS_SessionEnumerator(tester)
         scanner.scan(timeout=0.1)
         scanner.show()
+    finally:
+        sim.join(timeout=10)
 
+
+= Simple check with different Sessions and diagnosticSessionControl
+drain_bus(iface0)
+
+example_responses = [ \
+     ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=1, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=2, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=3, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[2, 4], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=4, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[4, 5], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=5, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[3, 4], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=6, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[3], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=7, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[3], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=8, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_ERPR(resetType="hardReset")),
+     ECUResponse(session=range(0,255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x12, requestServiceId=0x10))
+     ]
+
+with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
+        new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
+    answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS)
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 3})
+    sim.start()
+    try:
+        conf.verb = -1
+        scanner = UDS_SessionEnumerator(tester)
+        scanner.scan(session=1, session_range=range(0, 20), timeout=0.1, reset_handler=lambda: tester.sr1(UDS()/UDS_ER(resetType='hardReset'), timeout=1, verbose=False), verbose=True)
+        scanner.show()
+        print(scanner.state_transitions)
+        print(scanner.sessions_visited)
+        print(scanner.get_session_paths())
     finally:
         sim.join(timeout=10)
 
