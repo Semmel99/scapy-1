@@ -1702,6 +1702,7 @@ def UDS_Scan(sock, reset_handler, **kwargs):
     reset_handler()
 
     available_sessions = sessions.get_session_paths()
+    print(available_sessions)
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_ServiceEnumerator(sock),
