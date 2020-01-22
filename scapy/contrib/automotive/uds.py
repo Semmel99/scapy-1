@@ -19,6 +19,7 @@ from scapy.error import log_loading, Scapy_Exception
 from scapy.utils import PeriodicSenderThread, make_lined_table
 from scapy.contrib.isotp import ISOTP
 from scapy.modules import six
+from scapy.error import warning
 
 
 """
@@ -1640,6 +1641,7 @@ def get_session_string(session):
         sprintf("%UDS_DSC.diagnosticSessionType%")
 
 
+# Todo, use function from Session Enumerator
 def enter_session_direct(socket, session, verbose=False, **kwargs):
     if session in [0, 1]:
         return False
@@ -1653,28 +1655,17 @@ def enter_session_direct(socket, session, verbose=False, **kwargs):
     return ans is not None and ans.service != 0x7f
 
 
-def enter_through_extended(socket, session, **kwargs):
-    if session == 3:
-        return False
-    return enter_session_direct(socket, 3, **kwargs) \
-        and enter_session_direct(socket, session, **kwargs)
-
-
-def enter_session(*args, **kwargs):
-    return enter_session_direct(*args, **kwargs) or \
-        enter_through_extended(*args, **kwargs)
-
-
 def execute_session_based_scan(sock, reset_handler, enumerator,
                                session_paths, **kwargs):
     for session_path in session_paths:
         reset_handler()
         change_successful = True
         for session_change in session_path:
-            if session_change != 1 and \
-                    enter_session_direct(sock, session_change) is False:
-                print("Error during session change to session %d" %
-                      session_change)
+            if session_change == 1:
+                continue
+            elif not enter_session_direct(sock, session_change, verbose=True):
+                warning("Error during session change to session %d" %
+                        session_change)
                 change_successful = False
                 break
 
