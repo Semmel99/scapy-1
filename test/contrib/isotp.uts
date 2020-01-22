@@ -865,7 +865,7 @@ assert(succ.is_set())
 with ISOTPSocket(MockCANSocket(), sid=0x641, did=0x241) as s:
     assert(s.impl.rx_thread.is_alive())
     s.close()
-    assert(not s.impl.rx_thread.join())
+    assert(not s.impl.rx_thread.join(5))
     assert(not s.impl.rx_thread.is_alive())
 
 
