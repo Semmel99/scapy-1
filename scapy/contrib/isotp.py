@@ -998,7 +998,8 @@ class TimeoutScheduler:
             return TimeoutScheduler.cancel(self)
 
         def __cmp__(self, other):
-            return int(self._when - other._when)
+            diff = self._when - other._when
+            return 0 if diff == 0 else (1 if diff > 0 else -1)
 
         def __lt__(self, other):
             return self._when < other._when
