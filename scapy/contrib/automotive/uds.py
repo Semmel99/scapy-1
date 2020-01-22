@@ -1680,8 +1680,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
             if session_path[-1] != 1:
                 tps.stop()
 
-            reset_handler()
-            enumerator.show()
+    enumerator.show()
 
 
 def UDS_Scan(sock, reset_handler, **kwargs):
