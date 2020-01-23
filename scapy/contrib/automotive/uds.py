@@ -1683,13 +1683,15 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
     enumerator.show()
 
 
-def UDS_Scan(sock, reset_handler, **kwargs):
+def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
     reset_handler()
     sessions = UDS_SessionEnumerator(sock)
     sessions.scan(reset_handler=reset_handler)
     sessions.show()
 
-    reset_handler()
+    scan_depth -= 1
+    if not scan_depth:
+        return
 
     available_sessions = sessions.get_session_paths()
     print(available_sessions)
@@ -1698,31 +1700,59 @@ def UDS_Scan(sock, reset_handler, **kwargs):
                                UDS_ServiceEnumerator(sock),
                                available_sessions)
 
+    scan_depth -= 1
+    if not scan_depth:
+        return
+
     rdbi = UDS_RDBIEnumerator(sock)
     execute_session_based_scan(sock, reset_handler, rdbi,
                                available_sessions,
                                scan_range=kwargs.pop("rdbi_scan_range",
                                                      range(0x10000)))
 
+    scan_depth -= 1
+    if not scan_depth:
+        return
+
     execute_session_based_scan(sock, reset_handler, UDS_WDBIEnumerator(sock),
                                available_sessions,
                                rdbi_enumerator=rdbi)
+
+    scan_depth -= 1
+    if not scan_depth:
+        return
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_RCEnumerator(sock),
                                available_sessions)
 
+    scan_depth -= 1
+    if not scan_depth:
+        return
+
     execute_session_based_scan(sock, reset_handler,
                                UDS_IOCBIEnumerator(sock),
                                available_sessions)
 
-    execute_session_based_scan(sock, reset_handler,
-                               UDS_SecurityAccessEnumerator(sock),
-                               available_sessions)
+    scan_depth -= 1
+    if not scan_depth:
+        return
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_SecurityAccessEnumerator(sock),
                                available_sessions)
+
+    scan_depth -= 1
+    if not scan_depth:
+        return
+
+    execute_session_based_scan(sock, reset_handler,
+                               UDS_SecurityAccessEnumerator(sock),
+                               available_sessions)
+
+    scan_depth -= 1
+    if not scan_depth:
+        return
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_SecurityAccessEnumerator(sock),
