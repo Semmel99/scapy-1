@@ -268,8 +268,6 @@ Creating a python-can CANSocket with multiple filters::
                                {'can_id': 0x600, 'can_mask': 0x7ff},
                                {'can_id': 0x7ff, 'can_mask': 0x7ff}])
 
-.. image:: ../graphics/animations/animation-scapy-python-can-cansocket.svg
-
 For further details on python-can check: https://python-can.readthedocs.io/
 
 CANSocket MITM attack with bridge and sniff
@@ -403,7 +401,7 @@ Canmatrix supports the creation of Scapy files from DBC or AUTOSAR XML files htt
 
 
 CAN Calibration Protocol (CCP)
-------------------------------
+==============================
 
 CCP is derived from CAN. The CAN-header is part of a CCP frame. CCP has two types
 of message objects. One is called Command Receive Object (CRO), the other is called
@@ -450,7 +448,7 @@ Since sr1 calls the answers function, our payload of the DTO objects gets interp
 command of our CRO object.
 
 ISOTP
------
+=====
 
 System compatibilities
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -483,7 +481,7 @@ Another remark in respect to ISOTPSocket compatibility. Always use with for sock
 
 
 ISOTP message
-^^^^^^^^^^^^^
+-------------
 
 Creating an ISOTP message::
 
@@ -514,7 +512,7 @@ Sniff ISOTP message::
    packets = isoTpSocket.sniff(timeout=0.5)
 
 ISOTP MITM attack with bridge and sniff
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------------
 
 Set up two vcans on Linux terminal::
 
@@ -589,7 +587,7 @@ Close sockets::
 An ISOTPSocket will not respect ``src, dst, exdst, exsrc`` of an ISOTP message object.
 
 ISOTP Sockets
--------------
+=============
 
 Scapy provides two kinds of ISOTP Sockets. One implementation, the ISOTPNativeSocket
 is using the Linux kernel module from Hartkopp. The other implementation, the ISOTPSoftSocket
@@ -597,7 +595,7 @@ is completely implemented in Python. This implementation can be used on Linux,
 Windows, and OSX.
 
 ISOTPNativeSocket
-^^^^^^^^^^^^^^^^^
+-----------------
 
 **Requires:**
 
@@ -616,7 +614,7 @@ Since this implementation is using a standard Linux socket, all Scapy functions
 like ``sniff, sr, sr1, bridge_and_sniff`` work out of the box.
 
 ISOTPSoftSocket
-^^^^^^^^^^^^^^^
+---------------
 
 ISOTPSoftSockets can use any CANSocket. This gives the flexibility to use all
 python-can interfaces. Additionally, these sockets work on Python2 and Python3.
@@ -643,7 +641,7 @@ Pythons ``with`` statement.
 
 
 ISOTPScan and ISOTPScanner
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------
 
 ISOTPScan is a utility function to find ISOTP-Endpoints on a CAN-Bus.
 ISOTPScanner is a commandline-utility for the identical function.
@@ -713,7 +711,7 @@ Interactive shell usage example::
 
 
 UDS
----
+===
 
 The main usage of UDS is flashing and diagnostic of an ECU. UDS is an
 application layer protocol and can be used as a DoIP or ENET payload or a UDS packet
@@ -795,7 +793,7 @@ If one wants to work with this custom additions, these can be loaded at runtime 
 .. image:: ../graphics/animations/animation-scapy-uds3.svg
 
 GMLAN
------
+=====
 GMLAN is very similar to UDS. It's GMs application layer protocol for
 flashing, calibration and diagnostic of their cars.
 Use the argument ``basecls=GMLAN`` on the ``init`` function of an ISOTPSocket.
@@ -806,7 +804,7 @@ Usage example:
 
 
 ECU Utility examples
---------------------
+====================
 
 The ECU utility can be used to analyze the internal states of an ECU under investigation.
 This utility depends heavily on the support of the used protocol. ``UDS`` is supported.
@@ -892,7 +890,7 @@ Usage example::
 
 
 SOME/IP and SOME/IP SD messages
--------------------------------
+===============================
 
 Creating a SOME/IP message
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -984,10 +982,11 @@ Stack it and send it::
    send(p)
 
 
-
+OBD
+===
 
 OBD message
--------------
+-----------
 
 OBD is implemented on top of ISOTP. Use an ISOTPSocket for the communication with an ECU. 
 You should set the parameters ``basecls=OBD`` and ``padding=True`` in your ISOTPSocket init call.
@@ -1063,10 +1062,10 @@ Request the Vehicle Identification Number (VIN)::
 
 
 Test-Setup Tutorials
---------------------
+====================
 
 Hardware Setup
-^^^^^^^^^^^^^^
+--------------
 
 Beagle Bone Black Operating System Setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1294,7 +1293,7 @@ Dual-CAN Setup
 
 
 ISO-TP Kernel Module Installation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------------
 
 A Linux ISO-TP kernel module can be downloaded from this website:
 ``https://github.com/hartkopp/can-isotp.git``. The file
@@ -1304,7 +1303,7 @@ ISO-TP kernel module should also be added to the ``/etc/modules`` file,
 to load this module automatically at system boot of the BBB.
 
 CAN-Interface Setup
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 As the final step to prepare the BBB's CAN interfaces for usage, these
 interfaces have to be set up through some terminal commands. The bitrate
@@ -1316,7 +1315,7 @@ can be chosen to fit the bitrate of a CAN bus under test.
     ip link set can1 up type can bitrate 500000
 
 Raspberry Pi SOME/IP setup
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------
 
 To build a small test environment in which you can send SOME/IP messages to and from server instances or disguise yourself as a server, one Raspberry Pi, your laptop and the vsomeip library are sufficient.
 
@@ -1349,7 +1348,7 @@ To build a small test environment in which you can send SOME/IP messages to and 
 
 
 Software Setup
-^^^^^^^^^^^^^^
+--------------
 
 Cannelloni Framework Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
