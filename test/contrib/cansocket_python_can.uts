@@ -188,12 +188,6 @@ with CANSocket(bustype='socketcan', channel='vcan0', can_filters=[{'can_id': 0x2
 
 = sniff with multiple filters
 
-sock1 = CANSocket(bustype='socketcan', channel='vcan0',
-                                          can_filters=[{'can_id': 0x200, 'can_mask': 0x7ff},
-                                                     {'can_id': 0x400, 'can_mask': 0x7ff},
-                                                     {'can_id': 0x600, 'can_mask': 0x7ff},
-                                                     {'can_id': 0x7ff, 'can_mask': 0x7ff}])
-
 msgs = [CAN(identifier=0x200, length=8, data=b'\x01\x02\x03\x04\x05\x06\x07\x08'),
     CAN(identifier=0x300, length=8, data=b'\x01\x02\x03\x04\x05\x06\x07\x08'),
     CAN(identifier=0x400, length=8, data=b'\x01\x02\x03\x04\x05\x06\x07\x08'),

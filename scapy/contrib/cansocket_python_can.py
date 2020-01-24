@@ -143,6 +143,7 @@ class SocketWrapper(can_BusABC):
 class PythonCANSocket(SuperSocket, SelectableObject):
     desc = "read/write packets at a given CAN interface " \
            "using a python-can bus object"
+    nonblocking_socket = True
 
     def __init__(self, **kwargs):
         self.basecls = kwargs.pop("basecls", CAN)
