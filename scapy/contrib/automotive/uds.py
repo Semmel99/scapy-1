@@ -1690,7 +1690,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
     sessions.show()
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     available_sessions = sessions.get_session_paths()
@@ -1701,7 +1701,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                available_sessions)
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     rdbi = UDS_RDBIEnumerator(sock)
@@ -1711,7 +1711,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                                      range(0x10000)))
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     execute_session_based_scan(sock, reset_handler, UDS_WDBIEnumerator(sock),
@@ -1719,7 +1719,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                rdbi_enumerator=rdbi)
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     execute_session_based_scan(sock, reset_handler,
@@ -1727,7 +1727,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                available_sessions)
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     execute_session_based_scan(sock, reset_handler,
@@ -1735,7 +1735,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                available_sessions)
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     execute_session_based_scan(sock, reset_handler,
@@ -1743,7 +1743,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                available_sessions)
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     execute_session_based_scan(sock, reset_handler,
@@ -1751,7 +1751,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
                                available_sessions)
 
     scan_depth -= 1
-    if not scan_depth:
+    if scan_depth == 0:
         return
 
     execute_session_based_scan(sock, reset_handler,
