@@ -141,67 +141,66 @@ drain_bus(iface1)
 succ = False
 started = threading.Event()
 
-sniffed = 0
-
 with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as sendSock, \
         new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as recvSock:
     def answer(pkt):
-        print(repr(pkt))
         pkt.service = pkt.service + 0x40
         recvSock.send(pkt)
     def sniffer():
-        global sniffed, succ
-        sniffed = 0
-        pkts = recvSock.sniff(timeout=1, prn=answer, started_callback=started.set)
-        sniffed = len(pkts)
-        succ = True
+        recvSock.sniff(timeout=1, prn=answer, started_callback=started.set)
     threadSniffer = threading.Thread(target=sniffer)
     threadSniffer.start()
     started.wait(timeout=5)
     session_scanner = UDS_SessionEnumerator(sendSock)
-    session_scanner.scan(session_range=range(3))
+    session_scanner.scan(session_range=range(1,4), timeout=0.01)
     sessions = session_scanner.results
     threadSniffer.join(timeout=5)
 
-print(session_scanner.results)
 session_scanner.show()
+
+assert len(session_scanner.results) == 9
+assert 3 in session_scanner.sessions_visited
+assert 1 in session_scanner.sessions_visited
+assert 2 in session_scanner.sessions_visited
 
 + Tests with ECU_am tests
 
 = Simple check with different Sessions and diagnosticSessionControl
 drain_bus(iface0)
 
+conf.verb = -1
+
 example_responses = [ \
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=1, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=2, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=3, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=4, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=5, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=6, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=7, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=8, sessionParameterRecord=b"dead")),
-     ECUResponse(session=range(0,8), security_level=0, responses=UDS() / UDS_ERPR(resetType="hardReset")),
-     ECUResponse(session=range(0,255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x11, requestServiceId=0x10))
+     ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=1, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=2, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=3, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=4, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=5, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=6, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=7, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=8, sessionParameterRecord=b"dead")),
+     ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_ERPR(resetType="hardReset")),
+     ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x11, requestServiceId=0x10))
      ]
 
 with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
         new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
-    answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS)
-    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 7})
+    answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS, verbose=False)
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 9})
     sim.start()
-    try:
-        scanner = UDS_SessionEnumerator(tester)
-        scanner.scan(timeout=0.01)
-        scanner.show()
-    finally:
-        sim.join(timeout=10)
-
+    scanner = UDS_SessionEnumerator(tester)
+    scanner.scan(timeout=0.05, reset_handler=answering_machine.ecu_state.reset)
+    scanner.show()
+    sim.join(timeout=10)
+    print(scanner.state_transitions)
+    print(scanner.sessions_visited)
+    print(scanner.get_session_paths())
 
 = Simple check with different Sessions and diagnosticSessionControl
 drain_bus(iface0)
 
 example_responses = [ \
-     ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=1, sessionParameterRecord=b"dead")),
+     ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=1, sessionParameterRecord=b"dead")),
      ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=2, sessionParameterRecord=b"dead")),
      ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=3, sessionParameterRecord=b"dead")),
      ECUResponse(session=[2, 4], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=4, sessionParameterRecord=b"dead")),
@@ -210,24 +209,23 @@ example_responses = [ \
      ECUResponse(session=[3], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=7, sessionParameterRecord=b"dead")),
      ECUResponse(session=[3], security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=8, sessionParameterRecord=b"dead")),
      ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_ERPR(resetType="hardReset")),
-     ECUResponse(session=range(0,255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x11, requestServiceId=0x10))
+     ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x12, requestServiceId=0x10))
      ]
+
+conf.verb = -1
 
 with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
         new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
     answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS)
-    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 3})
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 9})
     sim.start()
-    try:
-        conf.verb = -1
-        scanner = UDS_SessionEnumerator(tester)
-        scanner.scan(session=1, session_range=range(0, 20), timeout=0.1, reset_handler=lambda: tester.sr1(UDS()/UDS_ER(resetType='hardReset'), timeout=1, verbose=False), verbose=False)
-        scanner.show()
-        print(scanner.state_transitions)
-        print(scanner.sessions_visited)
-        print(scanner.get_session_paths())
-    finally:
-        sim.join(timeout=10)
+    scanner = UDS_SessionEnumerator(tester)
+    scanner.scan(session=1, session_range=range(1, 20), timeout=0.1, reset_handler=lambda: tester.sr1(UDS()/UDS_ER(resetType='hardReset'), timeout=1, verbose=False))
+    scanner.show()
+    print(scanner.state_transitions)
+    print(scanner.sessions_visited)
+    print(scanner.get_session_paths())
+    sim.join(timeout=10)
 
 
 + Cleanup
