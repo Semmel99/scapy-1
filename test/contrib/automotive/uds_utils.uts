@@ -152,7 +152,7 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     threadSniffer.start()
     started.wait(timeout=5)
     session_scanner = UDS_SessionEnumerator(sendSock)
-    session_scanner.scan(session_range=range(1,4), timeout=0.01)
+    session_scanner.scan(session_range=range(1,4), timeout=0.01, reset_handler=lambda: False)
     sessions = session_scanner.results
     threadSniffer.join(timeout=5)
 
@@ -189,10 +189,9 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     sim = threading.Thread(target=answering_machine, kwargs={'timeout': 9})
     sim.start()
     scanner = UDS_SessionEnumerator(tester)
-    scanner.scan(timeout=0.05, reset_handler=answering_machine.ecu_state.reset)
+    scanner.scan(session=1, timeout=0.05, reset_handler=answering_machine.ecu_state.reset)
     scanner.show()
     sim.join(timeout=10)
-    print(scanner.state_transitions)
     print(scanner.sessions_visited)
     print(scanner.get_session_paths())
 
@@ -220,9 +219,8 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     sim = threading.Thread(target=answering_machine, kwargs={'timeout': 9})
     sim.start()
     scanner = UDS_SessionEnumerator(tester)
-    scanner.scan(session=1, session_range=range(1, 20), timeout=0.1, reset_handler=lambda: tester.sr1(UDS()/UDS_ER(resetType='hardReset'), timeout=1, verbose=False))
+    scanner.scan(session=1, session_range=range(1, 20), timeout=0.1, reset_handler=answering_machine.ecu_state.reset, verbose=False)
     scanner.show()
-    print(scanner.state_transitions)
     print(scanner.sessions_visited)
     print(scanner.get_session_paths())
     sim.join(timeout=10)

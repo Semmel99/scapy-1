@@ -9,6 +9,8 @@
 import struct
 import time
 
+from collections import defaultdict, namedtuple
+
 from scapy.fields import ByteEnumField, StrField, ConditionalField, \
     BitEnumField, BitField, XByteField, FieldListField, \
     XShortField, X3BytesField, XIntField, ByteField, \
@@ -1351,6 +1353,68 @@ class UDS_TesterPresentSender(PeriodicSenderThread):
         PeriodicSenderThread.__init__(self, sock, pkt, interval)
 
 
+class Graph:
+    def __init__(self):
+        """
+        self.edges is a dict of all possible next nodes
+        e.g. {'X': ['A', 'B', 'C', 'E'], ...}
+        self.weights has all the weights between two nodes,
+        with the two nodes as a tuple as the key
+        e.g. {('X', 'A'): 7, ('X', 'B'): 2, ...}
+        """
+        self.edges = defaultdict(list)
+        self.weights = {}
+
+    def add_edge(self, from_node, to_node, weight=1):
+        # Note: assumes edges are bi-directional
+        self.edges[from_node].append(to_node)
+        self.edges[to_node].append(from_node)
+        self.weights[(from_node, to_node)] = weight
+        self.weights[(to_node, from_node)] = weight
+
+    @staticmethod
+    def dijsktra(graph, initial, end):
+        # shortest paths is a dict of nodes
+        # whose value is a tuple of (previous node, weight)
+        shortest_paths = {initial: (None, 0)}
+        current_node = initial
+        visited = set()
+
+        while current_node != end:
+            visited.add(current_node)
+            destinations = graph.edges[current_node]
+            weight_to_current_node = shortest_paths[current_node][1]
+
+            for next_node in destinations:
+                weight = \
+                    graph.weights[(current_node, next_node)] + \
+                    weight_to_current_node
+                if next_node not in shortest_paths:
+                    shortest_paths[next_node] = (current_node, weight)
+                else:
+                    current_shortest_weight = shortest_paths[next_node][1]
+                    if current_shortest_weight > weight:
+                        shortest_paths[next_node] = (current_node, weight)
+
+            next_destinations = {node: shortest_paths[node] for node in
+                                 shortest_paths if node not in visited}
+            if not next_destinations:
+                return None
+            # next node is the destination with the lowest weight
+            current_node = min(next_destinations,
+                               key=lambda k: next_destinations[k][1])
+
+        # Work back through destinations in shortest path
+        path = []
+        while current_node is not None:
+            path.append(current_node)
+            next_node = shortest_paths[current_node][0]
+            current_node = next_node
+        # Reverse path
+        path = path[::-1]
+        return path
+
+
 class UDS_Enumerator(object):
     """ Base class for Enumerators
 
@@ -1359,6 +1423,7 @@ class UDS_Enumerator(object):
     """
     description = "About my results"
     negative_response_blacklist = []
+    ScanResult = namedtuple("ScanResult", "session req resp")
 
     def __init__(self, sock):
         self.sock = sock
@@ -1369,24 +1434,26 @@ class UDS_Enumerator(object):
         _verb = kwargs.pop("verbose", False)
         for req in requests:
             res = self.sock.sr1(req, timeout=_tm, verbose=_verb, **kwargs)
-            self.results.append((session, req, res))
+            self.results.append(UDS_Enumerator.ScanResult(session, req, res))
 
     def reset(self):
         self.results = list()
 
-    def filter_results(self):
-        return [(session, req, res) for session, req, res in self.results
-                if res is not None and
-                (res.service != 0x7f or res.negativeResponseCode
+    @property
+    def filtered_results(self):
+        return [r for r in self.results
+                if r.resp is not None and
+                (r.resp.service != 0x7f or r.resp.negativeResponseCode
                  not in self.negative_response_blacklist)]
 
     def show(self, filtered=True):
-        data = self.results if not filtered else self.filter_results()
+        data = self.results if not filtered else self.filtered_results
         print("\r\n\r\n" + "=" * (len(self.description) + 10))
         print(" " * 5 + self.description)
         print("-" * (len(self.description) + 10))
         print("The following negative response codes are blacklisted: %s" %
               self.negative_response_blacklist)
+        print(type(data[0]))
         make_lined_table(data, self.get_table_entry)
 
     @staticmethod
@@ -1395,7 +1462,7 @@ class UDS_Enumerator(object):
 
     @staticmethod
     def get_label(response,
-                  positive_case="PR: PositiveResponse"):  # type: Union[str, Callable]  # noqa: E501
+                  positive_case="PR: PositiveResponse"):
         if response is None:
             label = "Timeout"
         elif response.service == 0x7f:
@@ -1414,56 +1481,47 @@ class UDS_Enumerator(object):
 class UDS_SessionEnumerator(UDS_Enumerator):
     description = "Available sessions"
     negative_response_blacklist = [0x10, 0x11, 0x12]
-    sessions_visited = set()
-    state_transitions = dict()
+
+    def __init__(self, sock):
+        super(UDS_SessionEnumerator, self).__init__(sock)
+        self.sessions_visited = set()
+        self.session_graph = Graph()
 
     def reset(self):
         super(UDS_SessionEnumerator, self).reset()
         self.sessions_visited = set()
-        self.state_transitions = dict()
+        self.session_graph = Graph()
 
-    @staticmethod
-    def find_path(graph, start, end, path=None):
-        if path is None:
-            path = list()
-        path = path + [start]
-        if start == end:
-            return path
-        if start not in graph.keys():
-            return None
-        for node in graph[start]:
-            if node in path:
-                continue
-            newpath = UDS_SessionEnumerator.find_path(graph, node, end, path)
-            if newpath:
-                return newpath
-        return None
-
-    def get_session_paths(self):
-        paths = [UDS_SessionEnumerator.find_path(
-            self.state_transitions, 1, s) for s in self.sessions_visited]
+    def get_session_paths(self, initial_session=1):
+        paths = [Graph.dijsktra(self.session_graph, initial_session, s)
+                 for s in self.sessions_visited if s != initial_session]
         return [p for p in paths if p is not None]
 
     def enter_session(self, session, reset_handler=None, verbose=False,
                       **kwargs):
         if reset_handler:
             reset_handler()
-        if session in [0, 1]:
+        if session in [0, 1] and reset_handler:
+            warning("You try to enter the defaultSession or session 0. The"
+                    "reset_handler did probably already reset your ECU to "
+                    "session 1.")
             return True
         req = UDS() / UDS_DSC(diagnosticSessionType=session)
         ans = self.sock.sr1(req, timeout=2, verbose=False, **kwargs)
-        if ans is not None and verbose:
-            print("Try to enter session %s" % session)
-            print(repr(req))
-            print(repr(ans))
-        return ans is not None and ans.service != 0x7f
+        if ans is not None:
+            if verbose:
+                print("Try to enter session %s" % session)
+                print(repr(req))
+                print(repr(ans))
+            return ans.service != 0x7f
+        else:
+            return False
 
     def scan(self, session=1, session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
-        if reset_handler is None:
-            reset_handler = lambda: 0
         pkts = UDS() / UDS_DSC(diagnosticSessionType=session_range)
-        reset_handler()
+        if reset_handler:
+            reset_handler()
 
         timeout = kwargs.pop("timeout", 3)
         for req in pkts:
@@ -1471,9 +1529,13 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                                                     timeout=timeout,
                                                     **kwargs)
             # reset if positive response received
-            last_response = self.results[-1][2]
-            if last_response is not None and last_response.service == 0x50:
-                reset_handler()
+            try:
+                last_response = self.results[-1].resp
+                if last_response.service == 0x50 and reset_handler:
+                    reset_handler()
+            except TypeError as e:
+                warning("Reset of scan target couldn't be performed.")
+                warning(e)
 
         self.sessions_visited.add(session)
         # get requests with positive response from this session
@@ -1482,6 +1544,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                 req is not None and resp.service == 0x50]
 
         for req in reqs:
+            self.session_graph.add_edge(session, req.diagnosticSessionType)
             if req.diagnosticSessionType in self.sessions_visited:
                 continue
             self.scan(session=req.diagnosticSessionType,
@@ -1491,9 +1554,6 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                                                   req.diagnosticSessionType,
                                                   **kwargs)]],
                       session_range=session_range, **kwargs)
-        if reqs:
-            self.state_transitions[session] = [r.diagnosticSessionType
-                                               for r in reqs]
 
     @staticmethod
     def get_table_entry(tup):
@@ -1532,9 +1592,8 @@ class UDS_RDBIEnumerator(UDS_Enumerator):
         super(UDS_RDBIEnumerator, self).scan(session, pkts, **kwargs)
 
     @staticmethod
-    def print_information(response_packet):
-        load = bytes(response_packet)[3:] if len(response_packet) > 3 \
-            else "No data available"
+    def print_information(resp):
+        load = bytes(resp)[3:] if len(resp) > 3 else "No data available"
         return "PR: %s" % ((load[:17] + b"...") if len(load) > 20 else load)
 
     @staticmethod
@@ -1562,7 +1621,7 @@ class UDS_WDBIEnumerator(UDS_Enumerator):
         elif isinstance(rdbi_enumerator, UDS_RDBIEnumerator):
             pkts = (UDS() / UDS_WDBI(dataIdentifier=res.dataIdentifier) /
                     Raw(load=bytes(res)[3:])
-                    for _, _, res in rdbi_enumerator.filter_results()
+                    for _, _, res in rdbi_enumerator.filtered_results
                     if res.service != 0x7f and len(bytes(res)) >= 3)
         else:
             raise Scapy_Exception("rdbi_enumerator has to be an instance "
