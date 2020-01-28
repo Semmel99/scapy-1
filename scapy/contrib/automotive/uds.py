@@ -1460,9 +1460,10 @@ class UDS_SessionEnumerator(UDS_Enumerator):
 
     def scan(self, session=1, session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
+        if reset_handler is None:
+            reset_handler = lambda: 0
         pkts = UDS() / UDS_DSC(diagnosticSessionType=session_range)
-        if reset_handler:
-            reset_handler()
+        reset_handler()
 
         timeout = kwargs.pop("timeout", 3)
         for req in pkts:
@@ -1471,8 +1472,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                                                     **kwargs)
             # reset if positive response received
             last_response = self.results[-1][2]
-            if last_response is not None and last_response.service == 0x50 \
-                    and reset_handler:
+            if last_response is not None and last_response.service == 0x50:
                 reset_handler()
 
         self.sessions_visited.add(session)
