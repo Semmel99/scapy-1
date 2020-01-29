@@ -1531,7 +1531,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
         self.session_graph = Graph()
 
     def show(self, filtered=True):
-        super(UDS_SessionEnumerator, self).__show(filtered)
+        super(UDS_SessionEnumerator, self).show(filtered)
         print("The following session paths were found: %s" %
               self.get_session_paths())
 
