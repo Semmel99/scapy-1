@@ -1719,22 +1719,22 @@ class UDS_RMBAEnumerator(UDS_Enumerator):
 
     def scan(self, session="DefaultSession", scan_range=range(0xffff),
              **kwargs):
-        pkts = (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=1, memoryAddress1=x, memorySize1=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=1, memoryAddress1=x, memorySize2=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=1, memoryAddress1=x, memorySize3=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=1, memoryAddress1=x, memorySize4=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=2, memoryAddress2=x, memorySize1=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=2, memoryAddress2=x, memorySize2=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=2, memoryAddress2=x, memorySize3=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=2, memoryAddress2=x, memorySize4=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=3, memoryAddress3=x, memorySize1=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=3, memoryAddress3=x, memorySize2=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=3, memoryAddress3=x, memorySize3=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=3, memoryAddress3=x, memorySize4=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=4, memoryAddress4=x, memorySize1=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=4, memoryAddress4=x, memorySize2=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=4, memoryAddress4=x, memorySize3=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
-        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=4, memoryAddress4=x, memorySize4=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
+        pkts = [UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=1, memoryAddress1=x, memorySize1=4) for x in [random.randint(0, 0x100) for _ in range(10)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=1, memoryAddress1=x, memorySize2=4) for x in [random.randint(0, 0x100) for _ in range(10)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=1, memoryAddress1=x, memorySize3=4) for x in [random.randint(0, 0x100) for _ in range(10)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=1, memoryAddress1=x, memorySize4=4) for x in [random.randint(0, 0x100) for _ in range(10)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=2, memoryAddress2=x, memorySize1=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=2, memoryAddress2=x, memorySize2=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=2, memoryAddress2=x, memorySize3=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=2, memoryAddress2=x, memorySize4=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=3, memoryAddress3=x, memorySize1=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=3, memoryAddress3=x, memorySize2=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=3, memoryAddress3=x, memorySize3=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=3, memoryAddress3=x, memorySize4=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=4, memoryAddress4=x, memorySize1=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=4, memoryAddress4=x, memorySize2=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=4, memoryAddress4=x, memorySize3=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)]]  # noqa: E501
+        pkts += [UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=4, memoryAddress4=x, memorySize4=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)]]  # noqa: E501
         super(UDS_RMBAEnumerator, self).scan(session, pkts, **kwargs)
 
     @staticmethod
