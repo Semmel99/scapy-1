@@ -1530,6 +1530,11 @@ class UDS_SessionEnumerator(UDS_Enumerator):
         self.sessions_visited = set()
         self.session_graph = Graph()
 
+    def show(self, filtered=True):
+        super(UDS_SessionEnumerator, self).__show(filtered)
+        print("The following session paths were found: %s" %
+              self.get_session_paths())
+
     def get_session_paths(self, initial_session=1):
         paths = [Graph.dijsktra(self.session_graph, initial_session, s)
                  for s in self.sessions_visited if s != initial_session]
