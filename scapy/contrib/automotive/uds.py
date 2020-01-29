@@ -1453,12 +1453,16 @@ class UDS_Enumerator(object):
         print("-" * (len(self.description) + 10))
         print("The following negative response codes are blacklisted: %s" %
               self.negative_response_blacklist)
-        print(type(data[0]))
         make_lined_table(data, self.get_table_entry)
 
     @staticmethod
     def get_table_entry(tup):
         raise NotImplementedError
+
+    @staticmethod
+    def get_session_string(session):
+        return (UDS() / UDS_DSC(diagnosticSessionType=session)). \
+            sprintf("%UDS_DSC.diagnosticSessionType%")
 
     @staticmethod
     def get_label(response,
@@ -1476,6 +1480,27 @@ class UDS_Enumerator(object):
                 raise Scapy_Exception("Unsupported Type for positive_case. "
                                       "Provide a string or a function.")
         return label
+
+    @staticmethod
+    def enter_session(socket, session, reset_handler=None,
+                      verbose=False, **kwargs):
+        if reset_handler:
+            reset_handler()
+        if session in [0, 1] and reset_handler:
+            warning("You try to enter the defaultSession or session 0. The"
+                    "reset_handler did probably already reset your ECU to "
+                    "session 1.")
+            return True
+        req = UDS() / UDS_DSC(diagnosticSessionType=session)
+        ans = socket.sr1(req, timeout=2, verbose=False, **kwargs)
+        if ans is not None:
+            if verbose:
+                print("Try to enter session %s" % session)
+                print(repr(req))
+                print(repr(ans))
+            return ans.service != 0x7f
+        else:
+            return False
 
 
 class UDS_SessionEnumerator(UDS_Enumerator):
@@ -1497,26 +1522,6 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                  for s in self.sessions_visited if s != initial_session]
         return [p for p in paths if p is not None]
 
-    def enter_session(self, session, reset_handler=None, verbose=False,
-                      **kwargs):
-        if reset_handler:
-            reset_handler()
-        if session in [0, 1] and reset_handler:
-            warning("You try to enter the defaultSession or session 0. The"
-                    "reset_handler did probably already reset your ECU to "
-                    "session 1.")
-            return True
-        req = UDS() / UDS_DSC(diagnosticSessionType=session)
-        ans = self.sock.sr1(req, timeout=2, verbose=False, **kwargs)
-        if ans is not None:
-            if verbose:
-                print("Try to enter session %s" % session)
-                print(repr(req))
-                print(repr(ans))
-            return ans.service != 0x7f
-        else:
-            return False
-
     def scan(self, session=1, session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
         pkts = UDS() / UDS_DSC(diagnosticSessionType=session_range)
@@ -1531,9 +1536,10 @@ class UDS_SessionEnumerator(UDS_Enumerator):
             # reset if positive response received
             try:
                 last_response = self.results[-1].resp
-                if last_response.service == 0x50 and reset_handler:
+                if last_response and last_response.service == 0x50 and \
+                        reset_handler:
                     reset_handler()
-            except TypeError as e:
+            except AttributeError as e:
                 warning("Reset of scan target couldn't be performed.")
                 warning(e)
 
@@ -1551,6 +1557,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
                       reset_handler=lambda: [x() for x in
                                              [reset_handler,
                                               lambda: self.enter_session(
+                                                  self.sock,
                                                   req.diagnosticSessionType,
                                                   **kwargs)]],
                       session_range=session_range, **kwargs)
@@ -1695,48 +1702,32 @@ class UDS_IOCBIEnumerator(UDS_Enumerator):
                 label)
 
 
-def get_session_string(session):
-    return (UDS() / UDS_DSC(diagnosticSessionType=session)).\
-        sprintf("%UDS_DSC.diagnosticSessionType%")
-
-
-# Todo, use function from Session Enumerator
-def enter_session_direct(socket, session, verbose=False, **kwargs):
-    if session in [0, 1]:
-        return False
-    req = UDS() / UDS_DSC(diagnosticSessionType=session)
-    ans = socket.sr1(req, timeout=2, verbose=False, **kwargs)
-    if ans is not None and verbose:
-        print("Try to enter session %s" % session)
-        print(repr(req))
-        print(repr(ans))
-    time.sleep(1)
-    return ans is not None and ans.service != 0x7f
-
-
 def execute_session_based_scan(sock, reset_handler, enumerator,
                                session_paths, **kwargs):
     for session_path in session_paths:
         reset_handler()
         change_successful = True
-        for session_change in session_path:
-            if session_change == 1:
+        for next_session in session_path:
+            if next_session == 1:
                 continue
-            elif not enter_session_direct(sock, session_change, verbose=True):
+
+            if not UDS_Enumerator.enter_session(sock, next_session, **kwargs):
                 warning("Error during session change to session %d" %
-                        session_change)
+                        next_session)
                 change_successful = False
                 break
 
+        current_session = session_path[-1]
         if change_successful:
-            tps = UDS_TesterPresentSender(sock)
-            if session_path[-1] != 1:
+            tps = None
+            if current_session != 1:
+                tps = UDS_TesterPresentSender(sock)
                 tps.start()
 
-            enumerator.scan(session=get_session_string(session_path[-1]),
-                            **kwargs)
+            enumerator.scan(session=UDS_Enumerator.get_session_string(
+                current_session), **kwargs)
 
-            if session_path[-1] != 1:
+            if tps:
                 tps.stop()
 
     enumerator.show()
@@ -1753,7 +1744,7 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
         return
 
     available_sessions = sessions.get_session_paths()
-    print(available_sessions)
+
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_ServiceEnumerator(sock),

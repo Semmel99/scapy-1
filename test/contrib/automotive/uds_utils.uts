@@ -163,7 +163,7 @@ assert 3 in session_scanner.sessions_visited
 assert 1 in session_scanner.sessions_visited
 assert 2 in session_scanner.sessions_visited
 
-+ Tests with ECU_am tests
++ Tests with ECU_am of UDS_SessionEnumerator
 
 = Simple check with different Sessions and diagnosticSessionControl
 drain_bus(iface0)
@@ -186,12 +186,15 @@ example_responses = [ \
 with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
         new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
     answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS, verbose=False)
-    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 9})
+    stop_sim = False
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 10, "stop_filter": lambda x: stop_sim})
     sim.start()
     scanner = UDS_SessionEnumerator(tester)
-    scanner.scan(session=1, timeout=0.05, reset_handler=answering_machine.ecu_state.reset)
+    scanner.scan(session=1, session_range=range(1, 0x100), timeout=0.1, reset_handler=answering_machine.ecu_state.reset)
     scanner.show()
-    sim.join(timeout=10)
+    stop_sim = True
+    tester.send(b"\x00\x00")
+    sim.join(timeout=2)
     print(scanner.sessions_visited)
     print(scanner.get_session_paths())
 
@@ -216,14 +219,97 @@ conf.verb = -1
 with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
         new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
     answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS)
-    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 9})
+    stop_sim = False
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 10, "stop_filter": lambda x: stop_sim})
     sim.start()
     scanner = UDS_SessionEnumerator(tester)
     scanner.scan(session=1, session_range=range(1, 20), timeout=0.1, reset_handler=answering_machine.ecu_state.reset, verbose=False)
     scanner.show()
+    stop_sim = True
+    tester.send(b"\x00\x00")
     print(scanner.sessions_visited)
     print(scanner.get_session_paths())
-    sim.join(timeout=10)
+    assert len(scanner.sessions_visited) == 8
+    assert len(scanner.get_session_paths()) == 7
+    sim.join(timeout=2)
+
+
++ Tests with ECU_am of UDS_ServiceEnumerator
+
+= Simple check
+drain_bus(iface0)
+
+conf.verb = -1
+
+example_responses = [ \
+    ECUResponse(session=range(1,8), security_level=0, responses=UDS(service=0x51)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x13, requestServiceId=0x10)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x22)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x22, requestServiceId=0x23)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x27)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x22, requestServiceId=0x31)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x34)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x22, requestServiceId=0x3e)),
+    ECUResponse(session=range(255), security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x2e))
+     ]
+
+with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
+        new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
+    answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS, verbose=False)
+    stop_sim = False
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 10, "stop_filter": lambda x: stop_sim})
+    sim.start()
+    scanner = UDS_ServiceEnumerator(tester)
+    scanner.scan(session=1, timeout=0.1)
+    scanner.show()
+    stop_sim = True
+    tester.send(b"\x00\x00")
+    sim.join(timeout=2)
+    res = sorted(scanner.filtered_results, key=lambda t: t.req.service)
+    print(len(res))
+    print(res[0])
+    assert len(res) == 9
+    assert res[1].resp.service == 0x51
+
+= Simple check of UDS_ServiceEnumerator with different sessions
+drain_bus(iface0)
+
+conf.verb = -1
+
+example_responses = [ \
+    ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=2, sessionParameterRecord=b"dead")),
+    ECUResponse(session=range(1,8), security_level=0, responses=UDS() / UDS_DSCPR(diagnosticSessionType=3, sessionParameterRecord=b"dead")),
+    ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x13, requestServiceId=0x28)),
+    ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x22)),
+    ECUResponse(session=[1], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x22, requestServiceId=0x23)),
+    ECUResponse(session=[2], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x27)),
+    ECUResponse(session=[2], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x22, requestServiceId=0x31)),
+    ECUResponse(session=[2], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x34)),
+    ECUResponse(session=[3], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x22, requestServiceId=0x3e)),
+    ECUResponse(session=[3], security_level=0, responses=UDS() / UDS_NR(negativeResponseCode=0x21, requestServiceId=0x2e))
+     ]
+
+with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, basecls=UDS) as ecu, \
+        new_can_socket0() as isocan2, ISOTPSocket(isocan2, sid=0x641, did=0x241, basecls=UDS) as tester:
+    answering_machine = ECU_am(supported_responses=example_responses, main_socket=ecu, basecls=UDS, verbose=False)
+    stop_sim = False
+    sim = threading.Thread(target=answering_machine, kwargs={'timeout': 10, "stop_filter": lambda x: stop_sim})
+    sim.start()
+    scanner = UDS_ServiceEnumerator(tester)
+    scanner.scan(session=1, timeout=0.1)
+    UDS_Enumerator.enter_session(tester, 2, None)
+    scanner.scan(session=2, timeout=0.1)
+    UDS_Enumerator.enter_session(tester, 3, None)
+    scanner.scan(session=3, timeout=0.1)
+    scanner.show()
+    stop_sim = True
+    tester.send(b"\x00\x00")
+    sim.join(timeout=2)
+    res = scanner.filtered_results
+    assert len([r for r in res if r.session == 1]) == 3
+    assert len([r for r in res if r.session == 2]) == 3
+    assert len([r for r in res if r.session == 3]) == 2
+    assert len(res) == 8
 
 
 + Cleanup
