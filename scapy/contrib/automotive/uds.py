@@ -7,6 +7,7 @@
 # scapy.contrib.status = loads
 
 import struct
+import random
 
 from collections import defaultdict, namedtuple
 
@@ -1450,6 +1451,19 @@ class UDS_Enumerator(object):
         print("\r\n\r\n" + "=" * (len(self.description) + 10))
         print(" " * 5 + self.description)
         print("-" * (len(self.description) + 10))
+        print("%d requests were sent, %d answered, %d unanswered" %
+              (len(self.results),
+               len([r for r in self.results if r.resp is not None]),
+               len([r for r in self.results if r.resp is None])))
+        nrs = [r.resp for r in self.results if r.resp is not None and
+               r.resp.service == 0x7f]
+        print("%d negative responses were received" % len(nrs))
+        nrcs = set([nr.negativeResponseCode for nr in nrs])
+        print("This negative response codes were received %s" % nrcs)
+        for nrc in nrcs:
+            print("\tNRC 0x%x received %d times" %
+                  (nrc,
+                   len([nr for nr in nrs if nr.negativeResponseCode == nrc])))
         print("The following negative response codes are blacklisted: %s" %
               self.negative_response_blacklist)
         make_lined_table(data, self.get_table_entry)
@@ -1701,6 +1715,42 @@ class UDS_IOCBIEnumerator(UDS_Enumerator):
                 label)
 
 
+class UDS_RMBAEnumerator(UDS_Enumerator):
+    description = "Readable Memory Adresses " \
+                  "and negative response per session"
+    negative_response_blacklist = [0x10, 0x11, 0x31]
+
+    def scan(self, session="DefaultSession", scan_range=range(0xffff),
+             **kwargs):
+        pkts = (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=1, memoryAddress1=x, memorySize1=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=1, memoryAddress1=x, memorySize2=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=1, memoryAddress1=x, memorySize3=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=1, memoryAddress1=x, memorySize4=4) for x in [random.randint(0, 0x100) for _ in range(10)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=2, memoryAddress2=x, memorySize1=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=2, memoryAddress2=x, memorySize2=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=2, memoryAddress2=x, memorySize3=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=2, memoryAddress2=x, memorySize4=4) for x in [random.randint(0, 0x100) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=3, memoryAddress3=x, memorySize1=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=3, memoryAddress3=x, memorySize2=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=3, memoryAddress3=x, memorySize3=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=3, memoryAddress3=x, memorySize4=4) for x in [random.randint(0, 0x10000) << 8 for _ in range(100)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=1, memoryAddressLen=4, memoryAddress4=x, memorySize1=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=2, memoryAddressLen=4, memoryAddress4=x, memorySize2=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=3, memoryAddressLen=4, memoryAddress4=x, memorySize3=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
+        pkts += (UDS() / UDS_RMBA(memorySizeLen=4, memoryAddressLen=4, memoryAddress4=x, memorySize4=4) for x in [random.randint(0, 0x1000000) << 8 for _ in range(1000)])  # noqa: E501
+        super(UDS_RMBAEnumerator, self).scan(session, pkts, **kwargs)
+
+    @staticmethod
+    def get_table_entry(tup):
+        session, req, res = tup
+        label = UDS_Enumerator.get_label(
+            res, positive_case=lambda: "PR: %s" % res.dataRecord)
+        return (session,
+                "0x%04x" % (getattr(req,
+                                    "memoryAddress%d" % req.memoryAddressLen)),
+                label)
+
+
 def execute_session_based_scan(sock, reset_handler, enumerator,
                                session_paths, **kwargs):
     for session_path in session_paths:
@@ -1753,10 +1803,10 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
         return
 
     rdbi = UDS_RDBIEnumerator(sock)
+    rdbi_scan_range = kwargs.pop("rdbi_scan_range", range(0x10000))
     execute_session_based_scan(sock, reset_handler, rdbi,
                                available_sessions,
-                               scan_range=kwargs.pop("rdbi_scan_range",
-                                                     range(0x10000)))
+                               scan_range=rdbi_scan_range)
 
     scan_depth -= 1
     if scan_depth == 0:
@@ -1765,6 +1815,14 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
     execute_session_based_scan(sock, reset_handler, UDS_WDBIEnumerator(sock),
                                available_sessions,
                                rdbi_enumerator=rdbi)
+
+    scan_depth -= 1
+    if scan_depth == 0:
+        return
+
+    execute_session_based_scan(sock, reset_handler,
+                               UDS_RMBAEnumerator(sock),
+                               available_sessions)
 
     scan_depth -= 1
     if scan_depth == 0:
@@ -1780,22 +1838,6 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_IOCBIEnumerator(sock),
-                               available_sessions)
-
-    scan_depth -= 1
-    if scan_depth == 0:
-        return
-
-    execute_session_based_scan(sock, reset_handler,
-                               UDS_SecurityAccessEnumerator(sock),
-                               available_sessions)
-
-    scan_depth -= 1
-    if scan_depth == 0:
-        return
-
-    execute_session_based_scan(sock, reset_handler,
-                               UDS_SecurityAccessEnumerator(sock),
                                available_sessions)
 
     scan_depth -= 1
