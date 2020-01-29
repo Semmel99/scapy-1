@@ -1436,9 +1436,6 @@ class UDS_Enumerator(object):
             res = self.sock.sr1(req, timeout=_tm, verbose=_verb, **kwargs)
             self.results.append(UDS_Enumerator.ScanResult(session, req, res))
 
-    def reset(self):
-        self.results = list()
-
     @property
     def filtered_results(self):
         return [r for r in self.results
@@ -1522,11 +1519,6 @@ class UDS_SessionEnumerator(UDS_Enumerator):
 
     def __init__(self, sock):
         super(UDS_SessionEnumerator, self).__init__(sock)
-        self.sessions_visited = set()
-        self.session_graph = Graph()
-
-    def reset(self):
-        super(UDS_SessionEnumerator, self).reset()
         self.sessions_visited = set()
         self.session_graph = Graph()
 
