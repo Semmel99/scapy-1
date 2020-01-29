@@ -1533,7 +1533,7 @@ class UDS_SessionEnumerator(UDS_Enumerator):
     def get_session_paths(self, initial_session=1):
         paths = [Graph.dijsktra(self.session_graph, initial_session, s)
                  for s in self.sessions_visited if s != initial_session]
-        return [p for p in paths if p is not None] + [1]
+        return [p for p in paths if p is not None] + [[1]]
 
     def scan(self, session=1, session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
