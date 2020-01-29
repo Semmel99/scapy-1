@@ -7,7 +7,6 @@
 # scapy.contrib.status = loads
 
 import struct
-import time
 
 from collections import defaultdict, namedtuple
 
@@ -1744,7 +1743,6 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
         return
 
     available_sessions = sessions.get_session_paths()
-
 
     execute_session_based_scan(sock, reset_handler,
                                UDS_ServiceEnumerator(sock),
