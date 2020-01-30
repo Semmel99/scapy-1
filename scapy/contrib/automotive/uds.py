@@ -1456,7 +1456,7 @@ class UDS_Enumerator(object):
                r.resp.service == 0x7f]
         print("%d negative responses were received" % len(nrs))
         nrcs = set([nr.negativeResponseCode for nr in nrs])
-        print("This negative response codes were received %s" % nrcs)
+        print("These negative response codes were received %s" % nrcs)
         for nrc in nrcs:
             print("\tNRC 0x%x received %d times" %
                   (nrc,
