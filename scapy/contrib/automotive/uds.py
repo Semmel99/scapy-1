@@ -1757,7 +1757,8 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
             if next_session == 1:
                 continue
 
-            if not UDS_Enumerator.enter_session(sock, next_session, **kwargs):
+            if not UDS_Enumerator.enter_session(
+                    sock, next_session, verbose=kwargs.get("verbose", False)):
                 warning("Error during session change to session %d" %
                         next_session)
                 change_successful = False
