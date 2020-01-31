@@ -9,6 +9,9 @@ from __future__ import print_function
 import getopt
 import sys
 import signal
+import re
+
+from ast import literal_eval
 
 import scapy.modules.six as six
 from scapy.config import conf
@@ -27,9 +30,10 @@ def signal_handler(sig, frame):
 
 
 def usage():
-    print('''usage:\tisotpscanner [-i interface] [-c channel] [-b bitrate]
-                [-n NOISE_LISTEN_TIME] [-t SNIFF_TIME] [-x|--extended]
-                [-C|--piso] [-v|--verbose] [-h|--help] [-s start] [-e end]\n
+    print('''usage:\tisotpscanner [-i interface] [-c channel] 
+                [-a python-can_args] [-n NOISE_LISTEN_TIME] [-t SNIFF_TIME] 
+                [-x|--extended] [-C|--piso] [-v|--verbose] [-h|--help] 
+                [-s start] [-e end]\n
     Scan for open ISOTP-Sockets.\n
     required arguments:
     -c, --channel         python-can channel or Linux SocketCAN interface name
@@ -42,8 +46,8 @@ def usage():
                           be provided. Please see:
                           https://python-can.readthedocs.io for
                           further interface examples.
-    -b, --bitrate         python-can bitrate.\n
     optional arguments:
+    -a, --python-can_args Additional arguments for a python-can Bus object.\n
     -h, --help            show this help message and exit
     -n NOISE_LISTEN_TIME, --noise_listen_time NOISE_LISTEN_TIME
                           Seconds listening for noise before scan.
@@ -57,8 +61,10 @@ def usage():
         --extended_can_id Use extended CAN identifiers
     Example of use:\n
     Python2 or Windows:
-    python2 -m scapy.tools.automotive.isotpscanner --interface=pcan --channel=PCAN_USBBUS1 --start 0 --end 100
+        python2 -m scapy.tools.automotive.isotpscanner --interface=pcan --channel=PCAN_USBBUS1 --start 0 --end 100
+    python2 -m scapy.tools.automotive.isotpscanner --interface=pcan --channel=PCAN_USBBUS1 -a 'bitrate=500000 fd=True' --start 0 --end 100
     python2 -m scapy.tools.automotive.isotpscanner --interface vector --channel 0 --start 0 --end 100
+    python2 -m scapy.tools.automotive.isotpscanner --interface vector --channel 0 --python-can_args 'bitrate=500000, poll_interval=1' --start 0 --end 100
     python2 -m scapy.tools.automotive.isotpscanner --interface socketcan --channel=can0 --start 0 --end 100\n
     Python3 on Linux:
     python3 -m scapy.tools.automotive.isotpscanner --channel can0 --start 0 --end 100 \n''',  # noqa: E501
@@ -76,13 +82,13 @@ def main():
     end = None
     channel = None
     interface = None
-    bitrate = None
+    python_can_args = None
 
     options = getopt.getopt(
         sys.argv[1:],
-        'vxCt:n:i:c:b:s:e:h:w',
+        'vxCt:n:i:c:a:s:e:h:w',
         ['verbose', 'noise_listen_time=', 'sniff_time=', 'interface=', 'piso',
-         'channel=', 'bitrate=', 'start=', 'end=', 'help', 'extended',
+         'channel=', 'python-can_args=', 'start=', 'end=', 'help', 'extended',
          'extended_can_id'])
 
     try:
@@ -104,8 +110,8 @@ def main():
                 interface = arg
             elif opt in ('-c', '--channel'):
                 channel = arg
-            elif opt in ('-b', '--bitrate'):
-                bitrate = int(arg)
+            elif opt in ('-a', '--python-can_args'):
+                python_can_args = arg
             elif opt in ('-s', '--start'):
                 start = int(arg, 16)
             elif opt in ('-e', '--end'):
@@ -145,10 +151,20 @@ def main():
 
     try:
         if PYTHON_CAN:
-            interface_string = "CANSocket(bustype=" \
-                               "'%s', channel='%s')" % \
-                               (interface, channel)
-            sock = CANSocket(bustype=interface, channel=channel)
+            if python_can_args:
+                interface_string = "CANSocket(bustype=" \
+                                   "'%s', channel='%s', %s)" % \
+                                   (interface, channel, python_can_args)
+                arg_dict = dict((k, literal_eval(v)) for k, v in
+                                (pair.split('=') for pair in
+                                 re.split(' |,', python_can_args)))
+                sock = CANSocket(bustype=interface, channel=channel,
+                                 **arg_dict)
+            else:
+                interface_string = "CANSocket(bustype=" \
+                                   "'%s', channel='%s')" % \
+                                   (interface, channel)
+                sock = CANSocket(bustype=interface, channel=channel)
         else:
             sock = CANSocket(channel=channel)
             interface_string = "\"%s\"" % channel
