@@ -57,9 +57,9 @@ def usage():
         --extended_can_id Use extended CAN identifiers
     Example of use:\n
     Python2 or Windows:
-    python2 -m scapy.tools.automotive.isotpscanner --interface=pcan --channel=PCAN_USBBUS1 --bitrate=250000 --start 0 --end 100
-    python2 -m scapy.tools.automotive.isotpscanner --interface vector --channel 0 --bitrate 250000 --start 0 --end 100
-    python2 -m scapy.tools.automotive.isotpscanner --interface socketcan --channel=can0 --bitrate=250000 --start 0 --end 100\n
+    python2 -m scapy.tools.automotive.isotpscanner --interface=pcan --channel=PCAN_USBBUS1 --start 0 --end 100
+    python2 -m scapy.tools.automotive.isotpscanner --interface vector --channel 0 --start 0 --end 100
+    python2 -m scapy.tools.automotive.isotpscanner --interface socketcan --channel=can0 --start 0 --end 100\n
     Python3 on Linux:
     python3 -m scapy.tools.automotive.isotpscanner --channel can0 --start 0 --end 100 \n''',  # noqa: E501
           file=sys.stderr)
@@ -120,7 +120,7 @@ def main():
     if start is None or \
             end is None or \
             channel is None or \
-            (PYTHON_CAN and (bitrate is None or interface is None)):
+            (PYTHON_CAN and interface is None):
         usage()
         print("\nPlease provide all required arguments.\n", file=sys.stderr)
         sys.exit(-1)
@@ -145,13 +145,12 @@ def main():
 
     try:
         if PYTHON_CAN:
-            sock = CANSocket(bustype='socketcan', channel=channel,
-                             bitrate=bitrate)
             interface_string = "CANSocket(bustype=" \
-                               "'%s', channel='%s', bitrate=%d)" % \
-                               (interface, channel, bitrate)
+                               "'%s', channel='%s')" % \
+                               (interface, channel)
+            sock = CANSocket(bustype=interface, channel=channel)
         else:
-            sock = CANSocket(iface=channel)
+            sock = CANSocket(channel=channel)
             interface_string = "\"%s\"" % channel
 
         if verbose:
