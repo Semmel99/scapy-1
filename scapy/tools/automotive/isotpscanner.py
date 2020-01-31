@@ -30,9 +30,9 @@ def signal_handler(sig, frame):
 
 
 def usage():
-    print('''usage:\tisotpscanner [-i interface] [-c channel] 
-                [-a python-can_args] [-n NOISE_LISTEN_TIME] [-t SNIFF_TIME] 
-                [-x|--extended] [-C|--piso] [-v|--verbose] [-h|--help] 
+    print('''usage:\tisotpscanner [-i interface] [-c channel]
+                [-a python-can_args] [-n NOISE_LISTEN_TIME] [-t SNIFF_TIME]
+                [-x|--extended] [-C|--piso] [-v|--verbose] [-h|--help]
                 [-s start] [-e end]\n
     Scan for open ISOTP-Sockets.\n
     required arguments:
@@ -157,7 +157,7 @@ def main():
                                    (interface, channel, python_can_args)
                 arg_dict = dict((k, literal_eval(v)) for k, v in
                                 (pair.split('=') for pair in
-                                 re.split(' |,', python_can_args)))
+                                 re.split(', | |,', python_can_args)))
                 sock = CANSocket(bustype=interface, channel=channel,
                                  **arg_dict)
             else:
