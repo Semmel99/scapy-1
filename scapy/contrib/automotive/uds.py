@@ -1432,8 +1432,14 @@ class UDS_Enumerator(object):
     def scan(self, session, requests, **kwargs):
         _tm = kwargs.pop("timeout", 0.5)
         _verb = kwargs.pop("verbose", False)
+        _exit_if_service_not_supported = \
+            kwargs.pop("exit_if_service_not_supported", True)
         for req in requests:
             res = self.sock.sr1(req, timeout=_tm, verbose=_verb, **kwargs)
+            if res and res.service is 0x11 and _exit_if_service_not_supported:
+                print("Exit scan because negative response "
+                      "serviceNotSupported received!")
+                return
             self.results.append(UDS_Enumerator.ScanResult(session, req, res))
 
     @property
@@ -1655,14 +1661,14 @@ class UDS_WDBIEnumerator(UDS_Enumerator):
                 label)
 
 
-class UDS_SecurityAccessEnumerator(UDS_Enumerator):
+class UDS_SAEnumerator(UDS_Enumerator):
     description = "Available security seeds with access type and session"
     negative_response_blacklist = [0x10, 0x11, 0x12]
 
     def scan(self, session="DefaultSesion", **kwargs):
         pkts = (UDS() / UDS_SA(securityAccessType=x)
                 for x in range(1, 0xff, 2))
-        super(UDS_SecurityAccessEnumerator, self).scan(session, pkts, **kwargs)
+        super(UDS_SAEnumerator, self).scan(session, pkts, **kwargs)
 
     @staticmethod
     def get_table_entry(tup):
@@ -1778,6 +1784,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
                 tps.stop()
 
     enumerator.show()
+    return enumerator
 
 
 def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
@@ -1800,11 +1807,11 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
     if scan_depth == 0:
         return
 
-    rdbi = UDS_RDBIEnumerator(sock)
     rdbi_scan_range = kwargs.pop("rdbi_scan_range", range(0x10000))
-    execute_session_based_scan(sock, reset_handler, rdbi,
-                               available_sessions,
-                               scan_range=rdbi_scan_range)
+    rdbi = execute_session_based_scan(sock, reset_handler,
+                                      UDS_RDBIEnumerator(sock),
+                                      available_sessions,
+                                      scan_range=rdbi_scan_range)
 
     scan_depth -= 1
     if scan_depth == 0:
@@ -1843,5 +1850,5 @@ def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
         return
 
     execute_session_based_scan(sock, reset_handler,
-                               UDS_SecurityAccessEnumerator(sock),
+                               UDS_SAEnumerator(sock),
                                available_sessions)
