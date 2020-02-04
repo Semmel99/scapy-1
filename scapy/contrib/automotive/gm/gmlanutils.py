@@ -531,6 +531,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
     reset_handler()
     tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
+    time.sleep(15)
     sw1 = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
     sw2 = GMLAN_GetSecurityAccess(sock, keyfunction, verbose=verbose)
     if sw1 and sw2:
@@ -541,6 +542,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
     reset_handler()
     tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
+    time.sleep(15)
     sw1 = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
     sw2 = GMLAN_GetSecurityAccess(sock, keyfunction, verbose=verbose)
     sw3 = GMLAN_RequestDownload(sock, 0x10, verbose=verbose, timeout=15)
