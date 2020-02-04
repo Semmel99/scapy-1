@@ -436,7 +436,7 @@ class GMLAN_RDBIEnumerator(GMLAN_Enumerator):
             res,
             positive_case=lambda: GMLAN_RDBIEnumerator.print_information(res))
         return (session,
-                "0x%04x: %s" % (req.identifiers[0],
+                "0x%04x: %s" % (req.dataIdentifier,
                                 req.sprintf("%GMLAN_RDBI.dataIdentifier%")),
                 label)
 
