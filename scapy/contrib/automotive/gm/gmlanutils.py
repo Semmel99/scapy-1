@@ -24,7 +24,8 @@ __all__ = ["GMLAN_TesterPresentSender", "GMLAN_InitDiagnostics",
            "GMLAN_GetSecurityAccess", "GMLAN_RequestDownload",
            "GMLAN_TransferData", "GMLAN_TransferPayload",
            "GMLAN_ReadMemoryByAddress", "GMLAN_BroadcastSocket",
-           "GMLAN_Scan", "GMLAN_ServiceEnumerator", "GMLAN_RDBIEnumerator"]
+           "GMLAN_Scan", "GMLAN_ServiceEnumerator", "GMLAN_RDBIEnumerator",
+           "GMLAN_RDBPIEnumerator", "GMLAN_RMBAEnumerator"]
 
 log_loading.info("\"conf.contribs['GMLAN']"
                  "['treat-response-pending-as-answer']\" set to True). This "
@@ -339,7 +340,7 @@ def GMLAN_ReadMemoryByAddress(sock, addr, length, timeout=None,
 def GMLAN_BroadcastSocket(interface):
     """Returns a GMLAN broadcast socket using interface."""
     return ISOTPSocket(interface, sid=0x101, did=0x0, basecls=GMLAN,
-                       extended_addr=0xfe)
+                       extended_addr=0xfe, padding=True)
 
 
 class GMLAN_Enumerator(Enumerator):
@@ -479,7 +480,7 @@ class GMLAN_RMBAEnumerator(GMLAN_Enumerator):
         session, req, res = tup
         label = GMLAN_Enumerator.get_label(
             res, positive_case=lambda: "PR: %s" % res.dataRecord)
-        return (session, "0x%04x" % req.memoryAddress, label)
+        return session, "0x%04x" % req.memoryAddress, label
 
 
 # ########################## SESSION HELPER ###################################
@@ -493,6 +494,7 @@ def switchToDiagnosticSession(socket):
 
 
 def execute_session_based_scan(sock, reset_handler, enumerator,
+                               bcast_sock=None,
                                keyfunction=lambda x: x, **kwargs):
     verbose = kwargs.get("verbose", False)
 
@@ -502,14 +504,14 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
 
     # ## SCAN ###
     reset_handler()
-    tps = GMLAN_TesterPresentSender(sock)
+    tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
     enumerator.scan(session="DefaultSession+TP")
     tps.stop()
 
     # ## SCAN ###
     reset_handler()
-    tps = GMLAN_TesterPresentSender(sock)
+    tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
     switched = switchToDiagnosticSession(sock)
     if switched:
@@ -518,7 +520,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
 
     # ## SCAN ###
     reset_handler()
-    tps = GMLAN_TesterPresentSender(sock)
+    tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
     switched = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
     if switched:
@@ -527,7 +529,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
 
     # ## SCAN ###
     reset_handler()
-    tps = GMLAN_TesterPresentSender(sock)
+    tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
     sw1 = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
     sw2 = GMLAN_GetSecurityAccess(sock, keyfunction, verbose=verbose)
@@ -537,14 +539,14 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
 
     # ## SCAN ###
     reset_handler()
-    tps = GMLAN_TesterPresentSender(sock)
+    tps = GMLAN_TesterPresentSender(bcast_sock)
     tps.start()
     sw1 = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
     sw2 = GMLAN_GetSecurityAccess(sock, keyfunction, verbose=verbose)
     sw3 = GMLAN_RequestDownload(sock, 0x10, verbose=verbose, timeout=15)
     if sw1 and sw2 and sw3:
         enumerator.scan(session="ProgrammingSession SA RD")
-    tps.start()
+    tps.stop()
 
     enumerator.show()
     return enumerator
@@ -562,6 +564,20 @@ def GMLAN_Scan(sock, reset_handler, scan_depth=10, **kwargs):
 
     execute_session_based_scan(sock, reset_handler,
                                GMLAN_RDBIEnumerator(sock), **kwargs)
+
+    scan_depth -= 1
+    if scan_depth == 0:
+        return
+
+    execute_session_based_scan(sock, reset_handler,
+                               GMLAN_RMBAEnumerator(sock), **kwargs)
+
+    scan_depth -= 1
+    if scan_depth == 0:
+        return
+
+    execute_session_based_scan(sock, reset_handler,
+                               GMLAN_RDBPIEnumerator(sock), **kwargs)
 
     scan_depth -= 1
     if scan_depth == 0:
