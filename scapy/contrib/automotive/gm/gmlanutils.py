@@ -23,7 +23,8 @@ from scapy.utils import PeriodicSenderThread
 __all__ = ["GMLAN_TesterPresentSender", "GMLAN_InitDiagnostics",
            "GMLAN_GetSecurityAccess", "GMLAN_RequestDownload",
            "GMLAN_TransferData", "GMLAN_TransferPayload",
-           "GMLAN_ReadMemoryByAddress", "GMLAN_BroadcastSocket"]
+           "GMLAN_ReadMemoryByAddress", "GMLAN_BroadcastSocket",
+           "GMLAN_Scan", "GMLAN_ServiceEnumerator", "GMLAN_RDBIEnumerator"]
 
 log_loading.info("\"conf.contribs['GMLAN']"
                  "['treat-response-pending-as-answer']\" set to True). This "
