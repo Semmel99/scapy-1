@@ -9,8 +9,6 @@
 import struct
 import random
 
-from collections import defaultdict, namedtuple
-
 from scapy.fields import ByteEnumField, StrField, ConditionalField, \
     BitEnumField, BitField, XByteField, FieldListField, \
     XShortField, X3BytesField, XIntField, ByteField, \
@@ -18,10 +16,10 @@ from scapy.fields import ByteEnumField, StrField, ConditionalField, \
 from scapy.packet import Packet, bind_layers, NoPayload, Raw
 from scapy.config import conf
 from scapy.error import log_loading, Scapy_Exception
-from scapy.utils import PeriodicSenderThread, make_lined_table
+from scapy.utils import PeriodicSenderThread
 from scapy.contrib.isotp import ISOTP
-from scapy.modules import six
 from scapy.error import warning
+from scapy.contrib.automotive.enumerator import Enumerator, Graph
 
 
 """
@@ -1353,123 +1351,27 @@ class UDS_TesterPresentSender(PeriodicSenderThread):
         PeriodicSenderThread.__init__(self, sock, pkt, interval)
 
 
-class Graph:
-    def __init__(self):
-        """
-        self.edges is a dict of all possible next nodes
-        e.g. {'X': ['A', 'B', 'C', 'E'], ...}
-        self.weights has all the weights between two nodes,
-        with the two nodes as a tuple as the key
-        e.g. {('X', 'A'): 7, ('X', 'B'): 2, ...}
-        """
-        self.edges = defaultdict(list)
-        self.weights = {}
-
-    def add_edge(self, from_node, to_node, weight=1):
-        # Note: assumes edges are bi-directional
-        self.edges[from_node].append(to_node)
-        self.edges[to_node].append(from_node)
-        self.weights[(from_node, to_node)] = weight
-        self.weights[(to_node, from_node)] = weight
-
-    @staticmethod
-    def dijsktra(graph, initial, end):
-        # shortest paths is a dict of nodes
-        # whose value is a tuple of (previous node, weight)
-        shortest_paths = {initial: (None, 0)}
-        current_node = initial
-        visited = set()
-
-        while current_node != end:
-            visited.add(current_node)
-            destinations = graph.edges[current_node]
-            weight_to_current_node = shortest_paths[current_node][1]
-
-            for next_node in destinations:
-                weight = \
-                    graph.weights[(current_node, next_node)] + \
-                    weight_to_current_node
-                if next_node not in shortest_paths:
-                    shortest_paths[next_node] = (current_node, weight)
-                else:
-                    current_shortest_weight = shortest_paths[next_node][1]
-                    if current_shortest_weight > weight:
-                        shortest_paths[next_node] = (current_node, weight)
-
-            next_destinations = {node: shortest_paths[node] for node in
-                                 shortest_paths if node not in visited}
-            if not next_destinations:
-                return None
-            # next node is the destination with the lowest weight
-            current_node = min(next_destinations,
-                               key=lambda k: next_destinations[k][1])
-
-        # Work back through destinations in shortest path
-        path = []
-        while current_node is not None:
-            path.append(current_node)
-            next_node = shortest_paths[current_node][0]
-            current_node = next_node
-        # Reverse path
-        path = path[::-1]
-        return path
-
-
-class UDS_Enumerator(object):
-    """ Base class for Enumerators
+class UDS_Enumerator(Enumerator):
+    """ Base class for UDS Enumerators
 
     Args:
         sock: socket where enumeration takes place
     """
-    description = "About my results"
-    negative_response_blacklist = []
-    ScanResult = namedtuple("ScanResult", "session req resp")
-
-    def __init__(self, sock):
-        self.sock = sock
-        self.results = list()
-
-    def scan(self, session, requests, **kwargs):
-        _tm = kwargs.pop("timeout", 0.5)
-        _verb = kwargs.pop("verbose", False)
-        _exit_if_service_not_supported = \
-            kwargs.pop("exit_if_service_not_supported", True)
-        for req in requests:
-            res = self.sock.sr1(req, timeout=_tm, verbose=_verb, **kwargs)
-            if res and res.service is 0x11 and _exit_if_service_not_supported:
-                print("Exit scan because negative response "
-                      "serviceNotSupported received!")
-                return
-            self.results.append(UDS_Enumerator.ScanResult(session, req, res))
-
     @property
     def filtered_results(self):
-        return [r for r in self.results
-                if r.resp is not None and
-                (r.resp.service != 0x7f or r.resp.negativeResponseCode
-                 not in self.negative_response_blacklist)]
+        return [r for r in super(UDS_Enumerator, self).filtered_results
+                if r.resp.service != 0x7f or r.resp.negativeResponseCode
+                not in self.negative_response_blacklist]
 
-    def show(self, filtered=True):
-        data = self.results if not filtered else self.filtered_results
-        print("\r\n\r\n" + "=" * (len(self.description) + 10))
-        print(" " * 5 + self.description)
-        print("-" * (len(self.description) + 10))
-        print("%d requests were sent, %d answered, %d unanswered" %
-              (len(self.results),
-               len([r for r in self.results if r.resp is not None]),
-               len([r for r in self.results if r.resp is None])))
+    def show_negative_response_details(self):
         nrs = [r.resp for r in self.results if r.resp is not None and
                r.resp.service == 0x7f]
-        print("%d negative responses were received" % len(nrs))
         nrcs = set([nr.negativeResponseCode for nr in nrs])
         print("These negative response codes were received %s" % nrcs)
         for nrc in nrcs:
             print("\tNRC 0x%x received %d times" %
                   (nrc,
                    len([nr for nr in nrs if nr.negativeResponseCode == nrc])))
-        print("The following negative response codes are blacklisted: %s" %
-              self.negative_response_blacklist)
-        make_lined_table(data, self.get_table_entry)
 
     @staticmethod
     def get_table_entry(tup):
@@ -1482,20 +1384,11 @@ class UDS_Enumerator(object):
 
     @staticmethod
     def get_label(response,
-                  positive_case="PR: PositiveResponse"):
-        if response is None:
-            label = "Timeout"
-        elif response.service == 0x7f:
-            label = response.sprintf("NR: %UDS_NR.negativeResponseCode%")
-        else:
-            if isinstance(positive_case, six.string_types):
-                label = positive_case
-            elif callable(positive_case):
-                label = positive_case()
-            else:
-                raise Scapy_Exception("Unsupported Type for positive_case. "
-                                      "Provide a string or a function.")
-        return label
+                  positive_case="PR: PositiveResponse",
+                  negative_case="NR: NegativeResponse", ):
+        return Enumerator.get_label(
+            response, positive_case,
+            response.sprintf("NR: %UDS_NR.negativeResponseCode%"))
 
     @staticmethod
     def enter_session(socket, session, reset_handler=None,
@@ -1519,24 +1412,25 @@ class UDS_Enumerator(object):
             return False
 
 
-class UDS_SessionEnumerator(UDS_Enumerator):
+class UDS_DSCEnumerator(UDS_Enumerator):
     description = "Available sessions"
     negative_response_blacklist = [0x10, 0x11, 0x12]
 
     def __init__(self, sock):
-        super(UDS_SessionEnumerator, self).__init__(sock)
+        super(UDS_DSCEnumerator, self).__init__(sock)
         self.sessions_visited = set()
         self.session_graph = Graph()
 
     def show(self, filtered=True):
-        super(UDS_SessionEnumerator, self).show(filtered)
+        super(UDS_DSCEnumerator, self).show(filtered)
         print("The following session paths were found: %s" %
               self.get_session_paths())
 
     def get_session_paths(self, initial_session=1):
         paths = [Graph.dijsktra(self.session_graph, initial_session, s)
                  for s in self.sessions_visited if s != initial_session]
-        return [p for p in paths if p is not None] + [[1]]
+        return sorted([p for p in paths if p is not None] + [[1]],
+                      key=lambda x: x[-1])
 
     def scan(self, session=1, session_range=range(2, 0x100),
              reset_handler=None, **kwargs):
@@ -1546,9 +1440,8 @@ class UDS_SessionEnumerator(UDS_Enumerator):
 
         timeout = kwargs.pop("timeout", 3)
         for req in pkts:
-            super(UDS_SessionEnumerator, self).scan(session, [req],
-                                                    timeout=timeout,
-                                                    **kwargs)
+            super(UDS_DSCEnumerator, self).scan(session, [req],
+                                                timeout=timeout, **kwargs)
             # reset if positive response received
             try:
                 last_response = self.results[-1].resp
@@ -1789,7 +1682,7 @@ def execute_session_based_scan(sock, reset_handler, enumerator,
 
 def UDS_Scan(sock, reset_handler, scan_depth=10, **kwargs):
     reset_handler()
-    sessions = UDS_SessionEnumerator(sock)
+    sessions = UDS_DSCEnumerator(sock)
     sessions.scan(reset_handler=reset_handler)
     sessions.show()
 

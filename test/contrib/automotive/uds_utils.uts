@@ -151,7 +151,7 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     threadSniffer = threading.Thread(target=sniffer)
     threadSniffer.start()
     started.wait(timeout=5)
-    session_scanner = UDS_SessionEnumerator(sendSock)
+    session_scanner = UDS_DSCEnumerator(sendSock)
     session_scanner.scan(session_range=range(1,4), timeout=0.01, reset_handler=lambda: False)
     sessions = session_scanner.results
     threadSniffer.join(timeout=5)
@@ -163,7 +163,7 @@ assert 3 in session_scanner.sessions_visited
 assert 1 in session_scanner.sessions_visited
 assert 2 in session_scanner.sessions_visited
 
-+ Tests with ECU_am of UDS_SessionEnumerator
++ Tests with ECU_am of UDS_DSCEnumerator
 
 = Simple check with different Sessions and diagnosticSessionControl
 drain_bus(iface0)
@@ -189,7 +189,7 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     stop_sim = False
     sim = threading.Thread(target=answering_machine, kwargs={'timeout': 10, "stop_filter": lambda x: stop_sim})
     sim.start()
-    scanner = UDS_SessionEnumerator(tester)
+    scanner = UDS_DSCEnumerator(tester)
     scanner.scan(session=1, session_range=range(1, 0x100), timeout=0.1, reset_handler=answering_machine.ecu_state.reset)
     scanner.show()
     stop_sim = True
@@ -222,7 +222,7 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     stop_sim = False
     sim = threading.Thread(target=answering_machine, kwargs={'timeout': 10, "stop_filter": lambda x: stop_sim})
     sim.start()
-    scanner = UDS_SessionEnumerator(tester)
+    scanner = UDS_DSCEnumerator(tester)
     scanner.scan(session=1, session_range=range(1, 20), timeout=0.1, reset_handler=answering_machine.ecu_state.reset, verbose=False)
     scanner.show()
     stop_sim = True
@@ -230,7 +230,7 @@ with new_can_socket0() as isocan1, ISOTPSocket(isocan1, sid=0x241, did=0x641, ba
     print(scanner.sessions_visited)
     print(scanner.get_session_paths())
     assert len(scanner.sessions_visited) == 8
-    assert len(scanner.get_session_paths()) == 7
+    assert len(scanner.get_session_paths()) == 8
     sim.join(timeout=2)
 
 

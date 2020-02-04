@@ -10,8 +10,10 @@
 # scapy.contrib.status = loads
 
 import time
+import random
 from scapy.contrib.automotive.gm.gmlan import GMLAN, GMLAN_SA, GMLAN_RD, \
-    GMLAN_TD, GMLAN_PM, GMLAN_RMBA
+    GMLAN_TD, GMLAN_PM, GMLAN_RMBA, GMLAN_RDBI, GMLAN_RDBPI, GMLAN_IDO
+from scapy.contrib.automotive.enumerator import Enumerator
 from scapy.config import conf
 from scapy.contrib.isotp import ISOTPSocket
 from scapy.error import warning, log_loading
@@ -337,3 +339,229 @@ def GMLAN_BroadcastSocket(interface):
     """Returns a GMLAN broadcast socket using interface."""
     return ISOTPSocket(interface, sid=0x101, did=0x0, basecls=GMLAN,
                        extended_addr=0xfe)
+
+
+class GMLAN_Enumerator(Enumerator):
+    """ Base class for UDS Enumerators
+
+    Args:
+        sock: socket where enumeration takes place
+    """
+    @property
+    def filtered_results(self):
+        return [r for r in super(GMLAN_Enumerator, self).filtered_results
+                if r.resp.service != 0x7f or r.resp.returnCode
+                not in self.negative_response_blacklist]
+
+    def show_negative_response_details(self):
+        nrs = [r.resp for r in self.results if r.resp is not None and
+               r.resp.service == 0x7f]
+        nrcs = set([nr.returnCode for nr in nrs])
+        print("These negative response codes were received %s" % nrcs)
+        for nrc in nrcs:
+            print("\tNRC 0x%x received %d times" %
+                  (nrc,
+                   len([nr for nr in nrs if nr.returnCode == nrc])))
+
+    @staticmethod
+    def get_table_entry(tup):
+        raise NotImplementedError
+
+    @staticmethod
+    def get_label(response,
+                  positive_case="PR: PositiveResponse",
+                  negative_case="NR: NegativeResponse", ):
+        return Enumerator.get_label(
+            response, positive_case,
+            response.sprintf("NR: %GMLAN_NR.returnCode%"))
+
+    @staticmethod
+    def enter_session(socket, session, reset_handler=None,
+                      verbose=False, **kwargs):
+        if reset_handler:
+            reset_handler()
+        if session in [0, 1] and reset_handler:
+            warning("You try to enter the defaultSession or session 0. The"
+                    "reset_handler did probably already reset your ECU to "
+                    "session 1.")
+            return True
+        if session == 2:
+            return GMLAN_InitDiagnostics(socket, timeout=2, verbose=verbose)
+        else:
+            return False
+
+
+class GMLAN_ServiceEnumerator(GMLAN_Enumerator):
+    description = "Available services and negative response per session"
+    negative_response_blacklist = [0x11]
+
+    def scan(self, session="DefaultSession", **kwargs):
+        services = set(x & ~0x40 for x in range(0x100))
+        services.remove(0x10)  # Remove InitiateDiagnosticOperation service
+        services.remove(0x20)  # Remove ReturnToNormalOperation
+        services.remove(0x28)  # Remove DisableNormalCommunication service
+        services.remove(0xa5)  # Remove ProgrammingMode service
+        pkts = (GMLAN(service=x) for x in services)
+        super(GMLAN_ServiceEnumerator, self).scan(session, pkts, **kwargs)
+
+    @staticmethod
+    def get_table_entry(tup):
+        session, req, res = tup
+        label = GMLAN_Enumerator.get_label(res)
+        return (session,
+                "0x%02x: %s" % (req.service, req.sprintf("%GMLAN.service%")),
+                label)
+
+
+class GMLAN_RDBIEnumerator(GMLAN_Enumerator):
+    description = "Readable data identifier per session"
+    negative_response_blacklist = [0x11, 0x12, 0x31]
+
+    def scan(self, session="DefaultSession", scan_range=range(0x100),
+             **kwargs):
+        pkts = (GMLAN() / GMLAN_RDBI(dataIdentifier=x) for x in scan_range)
+        super(GMLAN_RDBIEnumerator, self).scan(session, pkts, **kwargs)
+
+    @staticmethod
+    def print_information(resp):
+        load = bytes(resp)[3:] if len(resp) > 3 else "No data available"
+        return "PR: %s" % ((load[:17] + b"...") if len(load) > 20 else load)
+
+    @staticmethod
+    def get_table_entry(tup):
+        session, req, res = tup
+        label = GMLAN_Enumerator.get_label(
+            res,
+            positive_case=lambda: GMLAN_RDBIEnumerator.print_information(res))
+        return (session,
+                "0x%04x: %s" % (req.identifiers[0],
+                                req.sprintf("%GMLAN_RDBI.dataIdentifier%")),
+                label)
+
+
+class GMLAN_RDBPIEnumerator(GMLAN_Enumerator):
+    description = "Readable parameter identifier per session"
+    negative_response_blacklist = [0x11, 0x12, 0x31]
+
+    def scan(self, session="DefaultSession", scan_range=range(0x10000),
+             **kwargs):
+        pkts = (GMLAN() / GMLAN_RDBPI(identifiers=[x]) for x in scan_range)
+        super(GMLAN_RDBPIEnumerator, self).scan(session, pkts, **kwargs)
+
+    @staticmethod
+    def get_table_entry(tup):
+        session, req, res = tup
+        label = GMLAN_Enumerator.get_label(
+            res,
+            positive_case=lambda: GMLAN_RDBIEnumerator.print_information(res))
+        return (session,
+                "0x%04x: %s" % (req.identifiers[0],
+                                req.sprintf(
+                                    "%GMLAN_RDBPI.identifiers%")[1:-1]),
+                label)
+
+
+class GMLAN_RMBAEnumerator(GMLAN_Enumerator):
+    description = "Readable Memory Adresses " \
+                  "and negative response per session"
+    negative_response_blacklist = [0x10, 0x11, 0x31]
+
+    def scan(self, session="DefaultSession", scan_range=range(2000),
+             **kwargs):
+        addrs = [random.randint(0, 0xffffffff) // 4 for _ in scan_range]
+        pkts = (GMLAN() / GMLAN_RMBA(memoryAddress=x, memorySize=0x10) for x in
+                addrs)
+        super(GMLAN_RMBAEnumerator, self).scan(session, pkts, **kwargs)
+
+    @staticmethod
+    def get_table_entry(tup):
+        session, req, res = tup
+        label = GMLAN_Enumerator.get_label(
+            res, positive_case=lambda: "PR: %s" % res.dataRecord)
+        return (session, "0x%04x" % req.memoryAddress, label)
+
+
+# ########################## SESSION HELPER ###################################
+
+def switchToDiagnosticSession(socket):
+    ans = socket.sr1(GMLAN() / GMLAN_IDO(subfunction=2), timeout=5,
+                     verbose=False)
+    if ans is not None and ans.service == 0x7f:
+        ans.show()
+    return ans is not None and ans.service != 0x7f
+
+
+def execute_session_based_scan(sock, reset_handler, enumerator,
+                               keyfunction=lambda x: x, **kwargs):
+    verbose = kwargs.get("verbose", False)
+
+    # ## SCAN ###
+    reset_handler()
+    enumerator.scan(session="DefaultSession")
+
+    # ## SCAN ###
+    reset_handler()
+    tps = GMLAN_TesterPresentSender(sock)
+    tps.start()
+    enumerator.scan(session="DefaultSession+TP")
+    tps.stop()
+
+    # ## SCAN ###
+    reset_handler()
+    tps = GMLAN_TesterPresentSender(sock)
+    tps.start()
+    switched = switchToDiagnosticSession(sock)
+    if switched:
+        enumerator.scan(session="DiagnosticSession")
+    tps.stop()
+
+    # ## SCAN ###
+    reset_handler()
+    tps = GMLAN_TesterPresentSender(sock)
+    tps.start()
+    switched = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
+    if switched:
+        enumerator.scan(session="ProgrammingSession")
+    tps.stop()
+
+    # ## SCAN ###
+    reset_handler()
+    tps = GMLAN_TesterPresentSender(sock)
+    tps.start()
+    sw1 = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
+    sw2 = GMLAN_GetSecurityAccess(sock, keyfunction, verbose=verbose)
+    if sw1 and sw2:
+        enumerator.scan(session="ProgrammingSession SA")
+    tps.stop()
+
+    # ## SCAN ###
+    reset_handler()
+    tps = GMLAN_TesterPresentSender(sock)
+    tps.start()
+    sw1 = GMLAN_InitDiagnostics(sock, timeout=20, verbose=verbose)
+    sw2 = GMLAN_GetSecurityAccess(sock, keyfunction, verbose=verbose)
+    sw3 = GMLAN_RequestDownload(sock, 0x10, verbose=verbose, timeout=15)
+    if sw1 and sw2 and sw3:
+        enumerator.scan(session="ProgrammingSession SA RD")
+    tps.start()
+
+    enumerator.show()
+    return enumerator
+
+
+def GMLAN_Scan(sock, reset_handler, scan_depth=10, **kwargs):
+    reset_handler()
+
+    execute_session_based_scan(sock, reset_handler,
+                               GMLAN_ServiceEnumerator(sock), **kwargs)
+
+    scan_depth -= 1
+    if scan_depth == 0:
+        return
+
+    execute_session_based_scan(sock, reset_handler,
+                               GMLAN_RDBIEnumerator(sock), **kwargs)
+
+    scan_depth -= 1
+    if scan_depth == 0:
+        return
