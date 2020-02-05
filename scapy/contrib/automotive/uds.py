@@ -1367,10 +1367,13 @@ class UDS_Enumerator(Enumerator):
         nrs = [r.resp for r in self.results if r.resp is not None and
                r.resp.service == 0x7f]
         nrcs = set([nr.negativeResponseCode for nr in nrs])
-        print("These negative response codes were received %s" % nrcs)
+        print("These negative response codes were received " +
+              " ".join([hex(c) for c in nrcs]))
         for nrc in nrcs:
-            print("\tNRC 0x%x received %d times" %
+            print("\tNRC 0x%02x: %s received %d times" %
                   (nrc,
+                   UDS_NR(negativeResponseCode=nrc).sprintf(
+                       "%UDS_NR.negativeResponseCode%"),
                    len([nr for nr in nrs if nr.negativeResponseCode == nrc])))
 
     @staticmethod
