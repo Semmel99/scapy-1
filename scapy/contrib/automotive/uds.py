@@ -1573,7 +1573,7 @@ class UDS_SAEnumerator(UDS_Enumerator):
 
 class UDS_RCEnumerator(UDS_Enumerator):
     description = "Available RoutineControls and negative response per session"
-    negative_response_blacklist = [0x10, 0x11, 0x31]
+    negative_response_blacklist = [0x10, 0x11, 0x12, 0x31]
 
     def scan(self, session="DefaultSession", scan_range=range(0xffff),
              **kwargs):
