@@ -93,7 +93,7 @@ class Enumerator(object):
         _tm = kwargs.pop("timeout", 0.5)
         _verb = kwargs.pop("verbose", False)
         _exit_if_service_not_supported = \
-            kwargs.pop("exit_if_service_not_supported", True)
+            kwargs.pop("exit_if_service_not_supported", False)
         for req in requests:
             res = self.sock.sr1(req, timeout=_tm, verbose=_verb, **kwargs)
             if res and res.service == 0x11 and _exit_if_service_not_supported:
