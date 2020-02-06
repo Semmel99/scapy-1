@@ -16,8 +16,6 @@ from scapy.contrib.automotive.uds import UDS
 from scapy.contrib.isotp import ISOTP
 from scapy.error import Scapy_Exception
 from scapy.data import MTU
-from scapy.config import conf
-from scapy.supersocket import SuperSocket
 
 
 """
