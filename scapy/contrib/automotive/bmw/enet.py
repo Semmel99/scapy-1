@@ -80,6 +80,7 @@ class ENETSocket(StreamSocket):
         s = socket.socket()
         s.connect((self.ip, self.port))
         StreamSocket.__init__(self, s, ENET)
+        print("connect")
 
 
 class ISOTP_ENETSocket(ENETSocket):
