@@ -91,17 +91,14 @@ class ENETSocket(StreamSocket):
             the function to be called next to get the packets (i.g. recv)
         """
         retry = 0
-        x = []
-        while retry:
+        while True:
             try:
-                x, _ = SuperSocket.select(sockets, remain)
+                return SuperSocket.select(sockets, remain)
             except ValueError as exc:
                 retry += 1
                 if retry >= 5:
                     raise exc
                 [s.connect() for s in sockets if hasattr(s, "connect")]
-
-        return x, None
 
 
 class ISOTP_ENETSocket(ENETSocket):
