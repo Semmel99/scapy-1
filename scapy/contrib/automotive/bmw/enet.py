@@ -72,8 +72,11 @@ class ENETSocket(StreamSocket):
     def __init__(self, ip='127.0.0.1', port=6801):
         self.ip = ip
         self.port = port
+        self.connect()
 
     def connect(self):
+        if not self.closed:
+            self.close()
         s = socket.socket()
         s.connect((self.ip, self.port))
         StreamSocket.__init__(self, s, ENET)
