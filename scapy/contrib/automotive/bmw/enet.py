@@ -16,6 +16,8 @@ from scapy.contrib.automotive.uds import UDS
 from scapy.contrib.isotp import ISOTP
 from scapy.error import Scapy_Exception
 from scapy.data import MTU
+from scapy.config import conf
+from scapy.supersocket import SuperSocket
 
 
 """
@@ -68,9 +70,35 @@ bind_layers(ENET, UDS)
 
 class ENETSocket(StreamSocket):
     def __init__(self, ip='127.0.0.1', port=6801):
+        self.ip = ip
+        self.port = port
+
+    def connect(self):
         s = socket.socket()
-        s.connect((ip, port))
+        s.connect((self.ip, self.port))
         StreamSocket.__init__(self, s, ENET)
+
+    @staticmethod
+    def select(sockets, remain=conf.recv_poll_rate):
+        """This function is called during sendrecv() routine to select
+        the available sockets.
+
+        :param sockets: an array of sockets that need to be selected
+        :returns: an array of sockets that were selected and
+            the function to be called next to get the packets (i.g. recv)
+        """
+        retry = 0
+        x = []
+        while retry:
+            try:
+                x, _ = SuperSocket.select(sockets, remain)
+            except ValueError as exc:
+                retry += 1
+                if retry >= 5:
+                    raise exc
+                [s.connect() for s in sockets if hasattr(s, "connect")]
+
+        return x, None
 
 
 class ISOTP_ENETSocket(ENETSocket):
@@ -78,7 +106,8 @@ class ISOTP_ENETSocket(ENETSocket):
         super(ISOTP_ENETSocket, self).__init__(ip, port)
         self.src = src
         self.dst = dst
-        self.basecls = basecls
+        self.basecls = ENET
+        self.outputcls = basecls
 
     def send(self, x):
         if not isinstance(x, ISOTP):
@@ -89,4 +118,4 @@ class ISOTP_ENETSocket(ENETSocket):
 
     def recv(self, x=MTU):
         pkt = super(ISOTP_ENETSocket, self).recv(x)
-        return self.basecls(bytes(pkt[1]))
+        return self.outputcls(bytes(pkt[1]))
