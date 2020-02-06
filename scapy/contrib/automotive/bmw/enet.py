@@ -81,25 +81,6 @@ class ENETSocket(StreamSocket):
         s.connect((self.ip, self.port))
         StreamSocket.__init__(self, s, ENET)
 
-    @staticmethod
-    def select(sockets, remain=conf.recv_poll_rate):
-        """This function is called during sendrecv() routine to select
-        the available sockets.
-
-        :param sockets: an array of sockets that need to be selected
-        :returns: an array of sockets that were selected and
-            the function to be called next to get the packets (i.g. recv)
-        """
-        retry = 0
-        while True:
-            try:
-                return SuperSocket.select(sockets, remain)
-            except ValueError as exc:
-                retry += 1
-                if retry >= 5:
-                    raise exc
-                [s.connect() for s in sockets if hasattr(s, "connect")]
-
 
 class ISOTP_ENETSocket(ENETSocket):
     def __init__(self, src, dst, ip='127.0.0.1', port=6801, basecls=ISOTP):
@@ -119,3 +100,22 @@ class ISOTP_ENETSocket(ENETSocket):
     def recv(self, x=MTU):
         pkt = super(ISOTP_ENETSocket, self).recv(x)
         return self.outputcls(bytes(pkt[1]))
+
+    @staticmethod
+    def select(sockets, remain=conf.recv_poll_rate):
+        """This function is called during sendrecv() routine to select
+        the available sockets.
+
+        :param sockets: an array of sockets that need to be selected
+        :returns: an array of sockets that were selected and
+            the function to be called next to get the packets (i.g. recv)
+        """
+        retry = 0
+        while True:
+            try:
+                return SuperSocket.select(sockets, remain)
+            except ValueError as exc:
+                retry += 1
+                if retry >= 5:
+                    raise exc
+                [s.connect() for s in sockets if hasattr(s, "connect")]
