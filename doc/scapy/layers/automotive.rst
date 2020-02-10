@@ -451,7 +451,7 @@ ISOTP
 =====
 
 System compatibilities
-^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 
 Dependent on your setup, different implementations have to be used.
 
