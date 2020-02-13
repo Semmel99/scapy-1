@@ -1513,7 +1513,7 @@ class UDS_RDBIEnumerator(UDS_Enumerator):
     @staticmethod
     def print_information(resp):
         load = bytes(resp)[3:] if len(resp) > 3 else "No data available"
-        return "PR: %s" % ((load[:17] + b"...") if len(load) > 20 else load)
+        return "PR: %s" % (load)
 
     @staticmethod
     def get_table_entry(tup):
